@@ -22,11 +22,12 @@ class Parameters:
 
         # Number of Frames to Run
         if cla.env == 'Hopper-v2':
-            self.num_frames = 4000000
+            self.num_frames = 1500000
         elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
-            self.num_frames = 6000000
+            self.num_frames = 3000000
         else:
-            self.num_frames = 2000000
+            self.num_frames = 500000
+            # NOTE reduced number of total frames
 
         # Synchronization
         if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2':
@@ -106,7 +107,10 @@ class Parameters:
         # Save Results
         self.state_dim = None  # To be initialised externally
         self.action_dim = None  # To be initialised externally
-        self.save_foldername = cla.logdir
+        if cla.logdir == None:
+            self.save_foldername = 'pderl/logs'
+        else:
+            self.save_foldername = cla.logdir
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
 

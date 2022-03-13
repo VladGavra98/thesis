@@ -8,7 +8,7 @@ from parameters import Parameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (HalfCheetah-v2) (Hopper-v2) ' +
-                                 '(Walker2d-v2) (Ant-v2)', required=True, type=str)
+                                 '(Walker2d-v2) (Ant-v2)', required=True, type=str, default = 'Swimmer-v2')
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
@@ -23,7 +23,7 @@ parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float
 parser.add_argument('-mut_noise', help='Use a random mutation magnitude', action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover', help='Make crossovers verbose', action='store_true')
-parser.add_argument('-logdir', help='Folder where to save results', type=str, required=True)
+parser.add_argument('-logdir', help='Folder where to save results', type=str)
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-opstat_freq', help='Frequency (in generations) to store operator statistics', type=int, default=1)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
@@ -34,6 +34,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":
     parameters = Parameters(parser)  # Inject the cla arguments in the parameters object
+
     tracker = utils.Tracker(parameters, ['erl'], '_score.csv')  # Initiate tracker
     frame_tracker = utils.Tracker(parameters, ['frame_erl'], '_score.csv')  # Initiate tracker
     time_tracker = utils.Tracker(parameters, ['time_erl'], '_score.csv')
