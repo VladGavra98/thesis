@@ -32,7 +32,8 @@ class Tracker:
             if len(var[0]) == 0: continue
             var[1] = sum(var[0])/float(len(var[0]))
 
-        if self.counter % 4 == 0:  # Save to csv file
+        # logging freq at 1/4 of updating freq.
+        if self.counter:  # Save to csv file
             for i, var in enumerate(self.all_tracker):
                 if len(var[0]) == 0: continue
                 var[2].append(np.array([generation, var[1]]))

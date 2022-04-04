@@ -65,9 +65,14 @@ if __name__ == "__main__":
     agent = agent.Agent(parameters, env)
     print('Running', parameters.env_name, ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
+    # Main training loop:
     next_save = parameters.next_save; time_start = time.time()
     while agent.num_frames <= parameters.num_frames:
+
+        # evaluate over all games 
         stats = agent.train()
+
+        #retrieve statistics
         best_train_fitness = stats['best_train_fitness']
         erl_score = stats['test_score']
         elite_index = stats['elite_index']
