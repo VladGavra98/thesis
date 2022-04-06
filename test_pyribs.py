@@ -55,43 +55,43 @@ archive = CVTArchive(
 )
 
 
-emitters = [
-    ImprovementEmitter(
-        archive,
-        np.zeros(dof),
-        # Initial step size of 0.1 seems reasonable based on the bounds.
-        0.1,
-        bounds=[(-np.pi, np.pi)] * dof,
-        batch_size=30,
-    ) for _ in range(5)
-]
+# emitters = [
+#     ImprovementEmitter(
+#         archive,
+#         np.zeros(dof),
+#         # Initial step size of 0.1 seems reasonable based on the bounds.
+#         0.1,
+#         bounds=[(-np.pi, np.pi)] * dof,
+#         batch_size=30,
+#     ) for _ in range(5)
+# ]
 
 
-opt = Optimizer(archive, emitters)
+# opt = Optimizer(archive, emitters)
 
 
-metrics = {
-    "Archive Size": {
-        "itrs": [0],
-        "vals": [0],  # Starts at 0.
-    },
-    "Max Objective": {
-        "itrs": [],
-        "vals": [],  # Does not start at 0.
-    },
-}
+# metrics = {
+#     "Archive Size": {
+#         "itrs": [0],
+#         "vals": [0],  # Starts at 0.
+#     },
+#     "Max Objective": {
+#         "itrs": [],
+#         "vals": [],  # Does not start at 0.
+#     },
+# }
 
-start_time = time.time()
-total_itrs = 700
-for itr in range(1, total_itrs + 1):
-    sols = opt.ask()
-    objs, bcs = simulate(sols, link_lengths)
-    opt.tell(objs, bcs)
+# start_time = time.time()
+# total_itrs = 700
+# for itr in range(1, total_itrs + 1):
+#     sols = opt.ask()
+#     objs, bcs = simulate(sols, link_lengths)
+#     opt.tell(objs, bcs)
 
-    # Logging.
-    if itr % 50 == 0:
-        metrics["Archive Size"]["itrs"].append(itr)
-        metrics["Archive Size"]["vals"].append(len(archive))
-        metrics["Max Objective"]["itrs"].append(itr)
-        metrics["Max Objective"]["vals"].append(archive.stats.obj_max)
-        print(f"Finished {itr} itrs after {time.time() - start_time:.2f} s")
+#     # Logging.
+#     if itr % 50 == 0:
+#         metrics["Archive Size"]["itrs"].append(itr)
+#         metrics["Archive Size"]["vals"].append(len(archive))
+#         metrics["Max Objective"]["itrs"].append(itr)
+#         metrics["Max Objective"]["vals"].append(archive.stats.obj_max)
+#         print(f"Finished {itr} itrs after {time.time() - start_time:.2f} s")
