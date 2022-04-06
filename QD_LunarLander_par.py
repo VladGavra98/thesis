@@ -55,7 +55,7 @@ from tqdm import tqdm
 from dask.distributed import Client, LocalCluster
 
 from ribs.archives import GridArchive
-from ribs.emitters import ImprovementEmitter, OptimizingEmitter
+from ribs.emitters import ImprovementEmitter, OptimizingEmitter, RandomDirectionEmitter
 from ribs.optimizers import Optimizer
 
 from saving_utils import *
@@ -159,7 +159,7 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
              if seed is None else [seed + i for i in range(n_emitters)])
     initial_model = np.zeros((action_dim, obs_dim))
     emitters = [
-        OptimizingEmitter(
+        RandomDirectionEmitter(
             archive,
             initial_model.flatten(),
             sigma0=sigma0,
@@ -342,11 +342,11 @@ def lunar_lander_main(workers=4,
     )
     client = Client(cluster)
 
-    # CMA-ME.
+    # CMA-ME
     optimizer = create_optimizer(seed, n_emitters, sigma0, batch_size)
     metrics = run_search(client, optimizer, env_seed, iterations, log_freq)
 
-    # Outputs.
+    # Outputs
     optimizer.archive.as_pandas().to_csv(outdir / "archive.csv")
     save_ccdf(optimizer.archive, str(outdir / "archive_ccdf.png"))
     save_heatmap(optimizer.archive, str(outdir / "heatmap.png"))
@@ -356,9 +356,11 @@ def lunar_lander_main(workers=4,
 
 
 if __name__ == "__main__":
+    # Declare folder for results
+    outdir_path = 'Results/run3_highD_output'
 
-    outdir_path ='Results/run2_highQ_output'
-    lunar_lander_main(outdir=outdir_path, workers = 6)
+    # Train
+    # lunar_lander_main(outdir=outdir_path, workers = 5)
 
-    # outdir_path ='Results/run1_output'
-    # lunar_lander_main(outdir=outdir_path,run_eval=True)
+    # Evaluate
+    lunar_lander_main(outdir=outdir_path,run_eval=True)
