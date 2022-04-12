@@ -7,12 +7,18 @@
 - [ ] Learned how SAC works (read, write, implement)
 - [x] Find what is a solution in pyribs
 - [x] Run a couple of basic scenarios on Lunar Lander
+
+> week8: 11/04 - 15/04
+- [x] Make a Gantt Chart
 - [ ] Read the QD paper on CMAP-Elites
 - [x] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
-- [x] Adapt PD-ERL for lunar lander
+- [x] Adapt PD-ERL for LunarLander (continuous)
 - [ ] Test QD learned polices on damaged lunar lander. It is very interesting to see how well they perform before any online learning.
-- [x] Make a Gantt Chart
+- [ ] Find out what the batch_size is in QD
 
+> week9: 16/04 - 22/04
+- [] Make table for overview of ERL, DRL and QD.
+- 
 
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
 ## Report Writing:

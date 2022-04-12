@@ -22,13 +22,16 @@ class Parameters:
 
         # Number of Frames to Run
         self.num_games = cla.num_games
-        if cla.env == 'Hopper-v2':
-            self.num_frames = 1500000
-        elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
-            self.num_frames = 3000000
-        else:
-            self.num_frames = 500000
-            # NOTE reduced number of total frames
+        
+        # if cla.env == 'Hopper-v2':
+        #     self.num_frames = 1500000
+        # elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
+        #     self.num_frames = 3000000
+        # elif 'lunarlander' in cla.env.lower():
+        #     self.num_frames = 600000
+        # else:
+        #     self.num_frames = 500000
+        # # NOTE reduced number of total frames
 
         # Synchronization
         if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2':
@@ -55,8 +58,13 @@ class Parameters:
         self.batch_size = 128
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 10000
-        self.ls = 128
+        self.buffer_size = 100000
+
+        if 'lunarlander' in cla.env.lower():
+            self.ls = 32
+        else:
+            self.ls = 128
+        print(self.ls)
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -64,7 +72,7 @@ class Parameters:
         self.alpha = 0.7
         self.beta_zero = 0.5
         self.learn_start = (1 + self.buffer_size / self.batch_size) * 2
-        self.total_steps = self.num_frames
+        # self.total_steps = self.num_frames
 
         # ========================================== NeuroEvolution Params =============================================
 
@@ -83,7 +91,7 @@ class Parameters:
             self.elite_fraction = 0.1
 
         # Number of actors in the population
-        self.pop_size = 10
+        self.pop_size = 30
 
         # Mutation and crossover
         self.crossover_prob = 0.0

@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 
-def simulate(model, seed=None, video_env=None):
+def simulate(model, env_name:str, seed=None, video_env=None):
     """Simulates the lunar lander model.
 
     Args:
@@ -23,14 +23,14 @@ def simulate(model, seed=None, video_env=None):
         # Since we are using multiple processes, it is simpler if each worker
         # just creates their own copy of the environment instead of trying to
         # share the environment. This also makes the function "pure."
-        env = gym.make("LunarLander-v2")
+        env = gym.make(env_name)
     else:
         env = video_env
 
     if seed is not None:
         env.seed(seed)
 
-    action_dim = env.action_space.n
+    action_dim = env.action_space.shape[0]
     obs_dim = env.observation_space.shape[0]
     model = model.reshape((action_dim, obs_dim))
 
@@ -42,7 +42,7 @@ def simulate(model, seed=None, video_env=None):
     done = False
 
     while not done:
-        action = np.argmax(model @ obs)  # Linear policy.
+        action = model @ obs  # Linear policy.
         obs, reward, done, _ = env.step(action)
         total_reward += reward
 

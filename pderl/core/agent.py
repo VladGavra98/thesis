@@ -111,7 +111,7 @@ class Agent:
         self.gen_frames = 0
         self.iterations += 1
 
-        # ========================== EVOLUTION  ==========================
+        '''+++++++++++++++++++++++++++++++   EVOLUTION    +++++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
         rewards = np.zeros(len(self.pop))
         errors  = np.zeros(len(self.pop))
@@ -127,14 +127,16 @@ class Agent:
         # all_fitness = 0.8 * rankdata(rewards) + 0.2 * rankdata(errors)
         all_fitness = rewards
 
-        # Validation test for NeuroEvolution champion
+        # Validation test for NeuroEvolution champion -- highest reward
         best_train_fitness = np.max(rewards)
         champion = self.pop[np.argmax(rewards)]
 
         # print("Best TD Error:", np.max(errors))
 
+        # Evaluate the champion
         test_score = 0
         for _ in range(5):
+            # do NOT  store these trials
             episode = self.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
             test_score += episode['reward']
         test_score /= 5.0
@@ -142,7 +144,7 @@ class Agent:
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, all_fitness)
 
-        # ========================== DDPG ===========================
+        ''' +++++++++++++++++++++++++++++++   DDPG    +++++++++++++++++++++++++++++++++++++++++++'''
         # Collect experience for training
         self.evaluate(self.rl_agent, is_action_noise=True)
 
@@ -151,6 +153,7 @@ class Agent:
         # Validation test for RL agent
         testr = 0
         for _ in range(5):
+            # do NOT  store these trials
             ddpg_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
             testr += ddpg_stats['reward']
         testr /= 5

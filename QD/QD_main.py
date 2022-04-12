@@ -65,6 +65,9 @@ from ribs.optimizers import Optimizer
 from saving_utils import *
 from lunar_lander import simulate
 
+
+env_name = "LunarLanderContinuous-v2"
+
 def create_optimizer(seed, n_emitters, sigma0, batch_size):
     """Creates the Optimizer based on given configurations.
 
@@ -74,10 +77,10 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
         A pyribs optimizer set up for CMA-ME (i.e. it has ImprovementEmitter's
         and a GridArchive).
     """
-    env = gym.make("LunarLander-v2")
-    action_dim = env.action_space.n
+    env = gym.make(env_name)
+    action_dim = env.action_space.shape[0]
     obs_dim = env.observation_space.shape[0]
-
+    print(f'Action-sapce dim: {action_dim} \nObservation space dim: {obs_dim}')
     archive = GridArchive(
         [50, 50],  # 50 bins in each dimension.
         [(-1.0, 1.0), (-3.0, 0.0)],  # (-1, 1) for x-pos and (-3, 0) for y-vel.
@@ -147,7 +150,7 @@ def run_search(client, optimizer, env_seed, iterations, log_freq):
 
         # Ask the Dask client to distribute the simulations among the Dask
         # workers, then gather the results of the simulations.
-        futures = client.map(lambda model: simulate(model, env_seed), sols)
+        futures = client.map(lambda model: simulate(model, env_name, env_seed), sols)
         results = client.gather(futures)
 
         # Process the results.
@@ -192,8 +195,9 @@ def run_evaluation(outdir, env_seed, random : bool = False):
     else:      indices = range(len(df))
 
     # Use a single env so that all the videos go to the same directory.
+    print(env_name)
     video_env = gym.wrappers.Monitor(
-        gym.make("LunarLander-v2"),
+        gym.make(env_name),
         str(outdir / "videos"),
         force=True,
         # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
@@ -202,22 +206,23 @@ def run_evaluation(outdir, env_seed, random : bool = False):
         video_callable=lambda idx: True,
     )
 
-    MAX_REWARD = 100; max_idx = 0
+    MAX_REWARD = 200; max_idx = 0
     for idx in tqdm(indices):
         model = np.array(df.loc[idx, "solution_0":])
-        reward, impact_x_pos, impact_y_vel = simulate(model, env_seed,
+        reward, impact_x_pos, impact_y_vel = simulate(model, env_name, env_seed,
                                                       video_env=None)
 
         if reward > MAX_REWARD:
-            print("Maximum index: ",idx)
+            print(f"Max reward {reward:0.3} at index = {idx}")
             best_model = model
             MAX_REWARD = reward
             max_idx = idx
+            
     # simulate again the best, this time with video
-    reward, impact_x_pos, impact_y_vel = simulate(best_model, env_seed,
+    reward, impact_x_pos, impact_y_vel = simulate(best_model, env_name, env_seed,
                                                     video_env=video_env) 
 
-    assert reward == MAX_REWARD                                          
+    assert int(reward) == int(MAX_REWARD) , f"Different rewards:{reward}, {MAX_REWARD}"                                          
     print(f"=== Index {max_idx} ===\n"
             "Model:\n"
             f"{model}\n"
@@ -233,10 +238,10 @@ def run_evaluation(outdir, env_seed, random : bool = False):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 def lunar_lander_main(workers=4,
                       env_seed=1339,
-                      iterations=500,
+                      iterations=400,
                       log_freq=25,
                       n_emitters=5,
-                      batch_size=30,
+                      batch_size=25,
                       sigma0=1.0,
                       seed=None,
                       outdir="lunar_lander_output",
@@ -269,6 +274,7 @@ def lunar_lander_main(workers=4,
     # The cluster simply manages several concurrent worker processes. If using
     # Dask across many workers, we would set up a more complicated cluster and
     # connect the client to it.
+    print(f"Total nubmer of simualtions: {iterations * batch_size * n_emitters}")
     cluster = LocalCluster(
         processes=True,  # Each worker is a process.
         n_workers=workers,  # Create this many worker processes.
@@ -291,7 +297,7 @@ def lunar_lander_main(workers=4,
 
 if __name__ == "__main__":
     # Declare folder for results
-    outdir_path = './Results/run3_highD_output'
+    outdir_path = './Results_QD/run4_continuous_highD'
 
     # Train
     # lunar_lander_main(outdir=outdir_path, workers = 5)
