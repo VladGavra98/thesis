@@ -4,11 +4,9 @@ from core import mod_utils as utils
 from core import replay_memory
 from core import ddpg as ddpg
 from scipy.spatial import distance
-from scipy.stats import rankdata
 from core import replay_memory
 from parameters import Parameters
-import fastrand
-import torch
+
 
 
 class Agent:
@@ -112,7 +110,7 @@ class Agent:
         # Evaluate genomes/individuals
         rewards = np.zeros(len(self.pop))
         errors = np.zeros(len(self.pop))
-        for i, net in enumerate(self.pop):
+        for i, net in enumerate(self.pop):   #loop over population
             for _ in range(self.args.num_evals):
                 episode = self.evaluate(net, is_render=False, is_action_noise=False, net_index=i)
                 rewards[i] += episode['reward']
@@ -131,7 +129,7 @@ class Agent:
         # print("Best TD Error:", np.max(errors))
 
         test_score = 0
-        for eval in range(5):
+        for _ in range(5):
             episode = self.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
             test_score += episode['reward']
         test_score /= 5.0
@@ -147,7 +145,7 @@ class Agent:
 
         # Validation test for RL agent
         testr = 0
-        for eval in range(5):
+        for _ in range(5):
             ddpg_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
             testr += ddpg_stats['reward']
         testr /= 5

@@ -198,7 +198,7 @@ class SSNE:
 
             # References to the variable keys
             W = model_params[key]
-            if len(W.shape) == 2: #Weights, no bias
+            if len(W.shape) == 2: # Only Weights are mutated, no bias
 
                 num_weights= W.shape[0]*W.shape[1]
                 ssne_prob = ssne_probabilities[i]
