@@ -2,6 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from ribs.visualize import grid_archive_heatmap
 
+plt.rcParams.update({'font.size': 16})
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #                       Saving Log Contents Utils 
@@ -15,9 +16,10 @@ def save_heatmap(archive, filename):
     """
     fig, ax = plt.subplots(figsize=(8, 6))
     grid_archive_heatmap(archive, vmin=-300, vmax=300, ax=ax)
+    fig.suptitle('Archive Illumiantion')
     ax.invert_yaxis()  # Makes more sense if larger velocities are on top.
-    ax.set_ylabel("Impact y-velocity")
-    ax.set_xlabel("Impact x-position")
+    ax.set_ylabel(r"Impact $\dot{y}$")
+    ax.set_xlabel(r"Impact $x$")
     fig.savefig(filename)
 
 
