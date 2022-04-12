@@ -8,8 +8,8 @@
 - [x] Find what is a solution in pyribs
 - [x] Run a couple of basic scenarios on Lunar Lander
 - [ ] Read the QD paper on CMAP-Elites
-- [ ] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
-- [ ] Adapt PD-ERL for lunar lander
+- [x] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
+- [x] Adapt PD-ERL for lunar lander
 - [ ] Test QD learned polices on damaged lunar lander. It is very interesting to see how well they perform before any online learning.
 - [x] Make a Gantt Chart
 

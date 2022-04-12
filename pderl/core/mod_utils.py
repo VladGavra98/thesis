@@ -133,18 +133,25 @@ class SumTree:
 
 
 class NormalizedActions(gym.ActionWrapper):
+    """ Wrapper class to resclae the gym env actions.
+        from [-1, 1] => [0, 1]
 
+    Args:
+        gym (module): Gym environment
+    """
     def action(self, action):
         action = (action + 1) / 2  # [-1, 1] => [0, 1]
         action *= (self.action_space.high - self.action_space.low)
         action += self.action_space.low
         return action
+    
+    
 
-    def _reverse_action(self, action):
-        action -= self.action_space.low
-        action /= (self.action_space.high - self.action_space.low)
-        action = action * 2 - 1
-        return action
+    # def _reverse_action(self, action):
+    #     action -= self.action_space.low
+    #     action /= (self.action_space.high - self.action_space.low)
+    #     action = action * 2 - 1
+    #     return action
 
 
 def fanin_init(size, fanin=None):

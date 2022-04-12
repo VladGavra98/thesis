@@ -49,8 +49,11 @@ class Agent:
         done = False
 
         while not done:
-            if store_transition: self.num_frames += 1; self.gen_frames += 1
-            if self.args.render and is_render: self.env.render()
+            # play one 'game'
+            if store_transition: 
+                self.num_frames += 1; self.gen_frames += 1
+            if self.args.render and is_render: 
+                self.env.render()
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:
                 action += self.ounoise.noise()
@@ -66,7 +69,9 @@ class Agent:
                 agent.buffer.add(*transition)
 
             state = next_state
-        if store_transition: self.num_games += 1
+        # updated games if is done
+        if store_transition: 
+            self.num_games += 1
 
         return {'reward': total_reward, 'td_error': total_error}
 
@@ -109,7 +114,7 @@ class Agent:
         # ========================== EVOLUTION  ==========================
         # Evaluate genomes/individuals
         rewards = np.zeros(len(self.pop))
-        errors = np.zeros(len(self.pop))
+        errors  = np.zeros(len(self.pop))
         for i, net in enumerate(self.pop):   #loop over population
             for _ in range(self.args.num_evals):
                 episode = self.evaluate(net, is_render=False, is_action_noise=False, net_index=i)
@@ -159,7 +164,7 @@ class Agent:
 
             self.rl_to_evo(self.rl_agent, self.pop[replace_index])
             self.evolver.rl_policy = replace_index
-            print('Sync from RL --> Nevo')
+            print('Sync from RL --> Evolution')
 
         # -------------------------- Collect statistics --------------------------
         return {

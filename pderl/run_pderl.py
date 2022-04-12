@@ -8,7 +8,8 @@ from parameters import Parameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (HalfCheetah-v2) (Hopper-v2) ' +
-                                 '(Walker2d-v2) (Ant-v2)', required=True, type=str, default = 'Swimmer-v2')
+                                 '(Walker2d-v2) (Ant-v2)', type=str, default = 'Swimmer-v2')
+parser.add_argument('-num_games', help = 'Number of complete games to play', default = 500)
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
@@ -42,7 +43,9 @@ if __name__ == "__main__":
     selection_tracker = utils.Tracker(parameters, ['elite', 'selected', 'discarded'], '_selection.csv')
 
     # Create Env
+    parameters.env_name = 'LunarLanderContinuous-v2'
     env = utils.NormalizedActions(gym.make(parameters.env_name))
+    print(env.action_space.shape)
     parameters.action_dim = env.action_space.shape[0]
     parameters.state_dim = env.observation_space.shape[0]
 
@@ -67,7 +70,7 @@ if __name__ == "__main__":
 
     # Main training loop:
     next_save = parameters.next_save; time_start = time.time()
-    while agent.num_frames <= parameters.num_frames:
+    while agent.num_games <= parameters.num_games:
 
         # evaluate over all games 
         stats = agent.train()

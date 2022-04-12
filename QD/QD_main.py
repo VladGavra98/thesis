@@ -47,7 +47,7 @@ Help:
 # basic OS interaction
 import time
 from pathlib import Path
-import sys
+
 
 # python standard modules for AI
 import gym

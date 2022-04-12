@@ -21,6 +21,7 @@ class Parameters:
         self.save_periodic = cla.save_periodic
 
         # Number of Frames to Run
+        self.num_games = cla.num_games
         if cla.env == 'Hopper-v2':
             self.num_frames = 1500000
         elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
@@ -33,7 +34,7 @@ class Parameters:
         if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2':
             self.rl_to_ea_synch_period = 1
         else:
-            self.rl_to_ea_synch_period = 10
+            self.rl_to_ea_synch_period = 5
 
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
@@ -54,7 +55,7 @@ class Parameters:
         self.batch_size = 128
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 1000000
+        self.buffer_size = 10000
         self.ls = 128
 
         # Prioritised Experience Replay

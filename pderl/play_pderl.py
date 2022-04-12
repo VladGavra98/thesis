@@ -8,10 +8,10 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (HalfCheetah-v2) (Ant-v2) (Reacher-v2) (Walker2d-v2) ' +
-                                 '(Swimmer-v2) (Hopper-v2)', required=True, type=str)
+                                 '(Swimmer-v2) (Hopper-v2)', type=str)
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
-parser.add_argument('-model_path', help='Path to the model', type=str, required=True)
+parser.add_argument('-model_path', help='Path to the model', type=str, required=False, default = 'pderl/logs/evo_net.pkl')
 args = parser.parse_args()
 
 
@@ -45,7 +45,9 @@ def load_genetic_agent(args):
 
 
 if __name__ == "__main__":
-    env = utils.NormalizedActions(gym.make(args.env))
+    env_name = 'LunarLanderContinuous-v2'
+    env = utils.NormalizedActions(gym.make(env_name))
+    # env = utils.NormalizedActions(gym.make(args.env))
 
     parameters = Parameters(None, init=False)
     parameters.individual_bs = 0
