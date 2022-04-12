@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import os
-# plt.updatercParams({'fontSize:16'})
+
 
 logs = 'pderl/logs'
 ddpg_score = np.genfromtxt(logs + '/ddpg_score.csv', skip_header= 1, delimiter=',')
