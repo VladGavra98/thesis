@@ -18,8 +18,7 @@ class Parameters:
         # Render episodes
         self.render = cla.render
         self.env_name = cla.env
-        self.save_periodic = cla.save_periodic
-
+        self.save_periodic = cla.save_periodic if cla.save_periodic else False
         # Number of Frames to Run
         self.num_games = cla.num_games
         
@@ -37,7 +36,7 @@ class Parameters:
         if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2':
             self.rl_to_ea_synch_period = 1
         else:
-            self.rl_to_ea_synch_period = 5
+            self.rl_to_ea_synch_period = 2
 
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
@@ -50,7 +49,7 @@ class Parameters:
         # Model save frequency if save is active
         self.next_save = cla.next_save
 
-        # DDPG params
+        # ========================================== DDPG Params =============================================
         self.use_ln = True
         self.gamma = 0.99
         self.tau = 0.001

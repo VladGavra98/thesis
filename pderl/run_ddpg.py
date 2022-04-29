@@ -2,9 +2,8 @@ import numpy as np, os, time, random
 from core import mod_utils as utils, agent
 import gym, torch
 import argparse
-import pickle
-from core.operator_runner import OperatorRunner
 from parameters import Parameters
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
@@ -24,7 +23,7 @@ parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float
 parser.add_argument('-mut_noise', help='Use a random mutation magnitude', action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover', help='Make crossovers verbose', action='store_true')
-parser.add_argument('-logdir', help='Folder where to save results', type=str, default = 'pderl/logs')
+parser.add_argument('-logdir', help='Folder where to save results', type=str, default = 'pderl/logs_ddpg')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-opstat_freq', help='Frequency (in generations) to store operator statistics', type=int, default=1)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
@@ -33,16 +32,14 @@ parser.add_argument('-test_operators', help='Runs the operator runner to test th
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+
 if __name__ == "__main__":
     parameters = Parameters(parser)  # Inject the cla arguments in the parameters object
 
-    tracker = utils.Tracker(parameters, ['erl', 'erl_std'], '_games.csv')  # Initiate tracker
-    frame_tracker = utils.Tracker(parameters, ['frame_erl'], '_frames.csv')  # Initiate tracker
-    time_tracker = utils.Tracker(parameters, ['time_erl'], '_time.csv')
+    time_tracker = utils.Tracker(parameters, ['ddpg_reward', 'ddpg_std'], '_time.csv')
     ddpg_tracker = utils.Tracker(parameters, ['ddpg_reward', 'ddpg_std'], '_games.csv')
     ddpg_frames = utils.Tracker(parameters, ['ddpg_reward', 'ddpg_std'], '_frames.csv')
-    selection_tracker = utils.Tracker(parameters, ['elite', 'selected', 'discarded'], '_selection.csv')
-
+   
     # Create Env
     env = utils.NormalizedActions(gym.make(parameters.env_name))
 
@@ -58,14 +55,8 @@ if __name__ == "__main__":
     np.random.seed(parameters.seed)
     random.seed(parameters.seed)
 
-    # # Tests the variation operators after that is saved first with -save_periodic
-    # if parameters.test_operators:
-    #     operator_runner = OperatorRunner(parameters, env)
-    #     operator_runner.run()
-    #     exit()
-
     # Create Agent
-    agent = agent.Agent(parameters, env)
+    agent = agent.Agent_ddpg(parameters, env)
     print('Running', parameters.env_name, ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
     # Main training loop:
@@ -75,60 +66,28 @@ if __name__ == "__main__":
         # evaluate over all games 
         stats = agent.train()
 
-        #retrieve statistics
-        best_train_fitness = stats['best_train_fitness']
-        erl_score = stats['test_score']
-        erl_std = stats['test_sd']
-        pop_avg = stats['pop_avg']
-        elite_index = stats['elite_index']
-        ddpg_reward = stats['ddpg_reward']
-        ddpg_std = stats['ddpg_std']
-        policy_gradient_loss = stats['pg_loss']
-        behaviour_cloning_loss = stats['bc_loss']
-        population_novelty = stats['pop_novelty']
+        if stats:
+            #retrieve statistics
+            ddpg_reward = stats['ddpg_reward']
+            ddpg_std = stats['ddpg_std']
+            policy_gradient_loss = stats['pg_loss']
 
-        print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
-              ' Train_Max:', '%.2f'%best_train_fitness if best_train_fitness is not None else None,
-              ' Test_Max:','%.2f'%erl_score if erl_score is not None else None,
-              ' Test_SD:','%.2f'%erl_std if erl_std is not None else None,
-              ' Population_Avg:', '%.2f'%pop_avg if pop_avg is not None else None,
-              '\n'
-              ' Avg:','%.2f'%tracker.all_tracker[0][1],
-              ' DDPG Reward:', '%.2f'%ddpg_reward,
-              ' PG Loss:', '%.4f' % policy_gradient_loss, '\n')
+            print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
+                ' DDPG Reward:', '%.2f'%ddpg_reward,
+                ' DDPG STD:', '%.2f'%ddpg_std,
+                ' PG Loss:', '%.4f' % policy_gradient_loss, '\n')
 
-        elite = agent.evolver.selection_stats['elite']/agent.evolver.selection_stats['total']
-        selected = agent.evolver.selection_stats['selected'] / agent.evolver.selection_stats['total']
-        discarded = agent.evolver.selection_stats['discarded'] / agent.evolver.selection_stats['total']
+            # Update loggers:
+            ddpg_tracker.update([ddpg_reward, ddpg_std], agent.num_games)
+            ddpg_frames.update([ddpg_reward, ddpg_std], agent.num_frames)
+            time_tracker.update([ddpg_reward, ddpg_std], time.time()-time_start)
 
-        # Update loggers:
-        tracker.update([erl_score, erl_std], agent.num_games)
-        frame_tracker.update([erl_score, erl_std], agent.num_frames)
-        ddpg_tracker.update([ddpg_reward, ddpg_std], agent.num_games)
-        ddpg_frames.update([ddpg_reward, ddpg_std], agent.num_frames)
-        time_tracker.update([erl_score, erl_std], time.time()-time_start)
-        selection_tracker.update([elite, selected, discarded], agent.num_frames)
 
         # Save Policy
         if agent.num_games > next_save:
             next_save += parameters.next_save
-            if elite_index is not None:
-                torch.save(agent.pop[elite_index].actor.state_dict(), os.path.join(parameters.save_foldername,
+            torch.save(agent.rl_agent.actor.state_dict(), os.path.join(parameters.save_foldername,
                                                                                    'evo_net.pkl'))
-
-                if parameters.save_periodic:
-                    save_folder = os.path.join(parameters.save_foldername, 'models')
-                    if not os.path.exists(save_folder):
-                        os.makedirs(save_folder)
-
-                    actor_save_name = os.path.join(save_folder, 'evo_net_actor_{}.pkl'.format(next_save))
-                    critic_save_name = os.path.join(save_folder, 'evo_net_critic_{}.pkl'.format(next_save))
-                    buffer_save_name = os.path.join(save_folder, 'champion_buffer_{}.pkl'.format(next_save))
-
-                    torch.save(agent.pop[elite_index].actor.state_dict(), actor_save_name)
-                    torch.save(agent.rl_agent.critic.state_dict(), critic_save_name)
-                    with open(buffer_save_name, 'wb+') as buffer_file:
-                        pickle.dump(agent.rl_agent.buffer, buffer_file)
 
             print("Progress Saved")
 

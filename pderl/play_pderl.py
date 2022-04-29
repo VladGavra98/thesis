@@ -15,9 +15,10 @@ parser.add_argument('-model_path', help='Path to the model', type=str, required=
 args = parser.parse_args()
 
 
-def evaluate(agent, env, trials=1, render=False):
+def evaluate(agent, env, trials : int =1, render : bool =False):
     results = []
-    for trial in range(trials):
+
+    for _ in range(trials):
         total_reward = 0
 
         state = env.reset()
