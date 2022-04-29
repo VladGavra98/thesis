@@ -8,7 +8,8 @@ from parameters import Parameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
-parser.add_argument('-num_games', help = 'Number of complete games to play', default = 50000)
+parser.add_argument('-num_games', help = 'Number of complete games to play', default = 10)
+#  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
@@ -23,7 +24,7 @@ parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float
 parser.add_argument('-mut_noise', help='Use a random mutation magnitude', action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover', help='Make crossovers verbose', action='store_true')
-parser.add_argument('-logdir', help='Folder where to save results', type=str)
+parser.add_argument('-logdir', help='Folder where to save results', type=str, default = 'pderl/logs')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-opstat_freq', help='Frequency (in generations) to store operator statistics', type=int, default=1)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     parameters = Parameters(parser)  # Inject the cla arguments in the parameters object
 
     tracker = utils.Tracker(parameters, ['erl'], '_score.csv')  # Initiate tracker
+    std_tracker = utils.Tracker(parameters, ['erl_std'], '_score.csv')  # Initiate tracker
     frame_tracker = utils.Tracker(parameters, ['frame_erl'], '_score.csv')  # Initiate tracker
     time_tracker = utils.Tracker(parameters, ['time_erl'], '_score.csv')
     ddpg_tracker = utils.Tracker(parameters, ['ddpg'], '_score.csv')
@@ -56,11 +58,11 @@ if __name__ == "__main__":
     np.random.seed(parameters.seed)
     random.seed(parameters.seed)
 
-    # Tests the variation operators after that is saved first with -save_periodic
-    if parameters.test_operators:
-        operator_runner = OperatorRunner(parameters, env)
-        operator_runner.run()
-        exit()
+    # # Tests the variation operators after that is saved first with -save_periodic
+    # if parameters.test_operators:
+    #     operator_runner = OperatorRunner(parameters, env)
+    #     operator_runner.run()
+    #     exit()
 
     # Create Agent
     agent = agent.Agent(parameters, env)
@@ -76,6 +78,8 @@ if __name__ == "__main__":
         #retrieve statistics
         best_train_fitness = stats['best_train_fitness']
         erl_score = stats['test_score']
+        erl_std = stats['test_sd']
+        pop_avg = stats['pop_avg']
         elite_index = stats['elite_index']
         ddpg_reward = stats['ddpg_reward']
         policy_gradient_loss = stats['pg_loss']
@@ -84,9 +88,11 @@ if __name__ == "__main__":
 
         print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
               ' Train_Max:', '%.2f'%best_train_fitness if best_train_fitness is not None else None,
-              ' Test_Score:','%.2f'%erl_score if erl_score is not None else None,
+              ' Test_Max:','%.2f'%erl_score if erl_score is not None else None,
+              ' Test_SD:','%.2f'%erl_std if erl_std is not None else None,
+              ' Population_Avg:', '%.2f'%pop_avg if pop_avg is not None else None,
+              '\n'
               ' Avg:','%.2f'%tracker.all_tracker[0][1],
-              ' ENV:  '+ parameters.env_name,
               ' DDPG Reward:', '%.2f'%ddpg_reward,
               ' PG Loss:', '%.4f' % policy_gradient_loss)
 
@@ -96,6 +102,7 @@ if __name__ == "__main__":
 
         print()
         tracker.update([erl_score], agent.num_games)
+        std_tracker.update([erl_std], agent.num_games)
         frame_tracker.update([erl_score], agent.num_frames)
         time_tracker.update([erl_score], time.time()-time_start)
         ddpg_tracker.update([ddpg_reward], agent.num_frames)

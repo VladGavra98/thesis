@@ -30,6 +30,10 @@ class Agent:
         self.ounoise = ddpg.OUNoise(args.action_dim)
         self.evolver = utils_ne.SSNE(self.args, self.rl_agent.critic, self.evaluate)
 
+        #Testing:
+        self.validation_tests = 5
+
+
         # Population novelty
         self.ns_r = 1.0
         self.ns_delta = 0.1
@@ -42,6 +46,18 @@ class Agent:
 
     def evaluate(self, agent: ddpg.GeneticAgent or ddpg.DDPG, is_render=False, is_action_noise=False,
                  store_transition=True, net_index=None):
+        """ Play one game to evaualute the agent.
+
+        Args:
+            agent (ddpg.GeneticAgentorddpg.DDPG): _description_
+            is_render (bool, optional): _description_. Defaults to False.
+            is_action_noise (bool, optional): _description_. Defaults to False.
+            store_transition (bool, optional): _description_. Defaults to True.
+            net_index (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         total_reward = 0.0
         total_error = 0.0
 
@@ -98,7 +114,7 @@ class Agent:
 
     def train_ddpg(self):
         bcs_loss, pgs_loss = [], []
-        if len(self.replay_buffer) > self.args.batch_size * 5:
+        if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
             for _ in range(int(self.gen_frames * self.args.frac_frames_train)):
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
@@ -127,19 +143,23 @@ class Agent:
         # all_fitness = 0.8 * rankdata(rewards) + 0.2 * rankdata(errors)
         all_fitness = rewards
 
-        # Validation test for NeuroEvolution champion -- highest reward
+        # Validation test for NeuroEvolution 
+        # champion -- highest reward
+        #  population_avg -- avergae over the entire agent population
         best_train_fitness = np.max(rewards)
+        population_avg = np.average(rewards)
         champion = self.pop[np.argmax(rewards)]
 
         # print("Best TD Error:", np.max(errors))
 
         # Evaluate the champion
-        test_score = 0
-        for _ in range(5):
+        test_scores = []
+        for _ in range(self.validation_tests):
             # do NOT  store these trials
             episode = self.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
-            test_score += episode['reward']
-        test_score /= 5.0
+            test_scores.append(episode['reward'])
+        test_score = np.average(test_scores)
+        test_sd = np.std(test_scores)
 
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, all_fitness)
@@ -152,11 +172,11 @@ class Agent:
 
         # Validation test for RL agent
         testr = 0
-        for _ in range(5):
+        for _ in range(self.validation_tests):
             # do NOT  store these trials
             ddpg_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
             testr += ddpg_stats['reward']
-        testr /= 5
+        test_ddpg = testr/ self.validation_tests
 
         # Sync RL Agent to NE every few steps
         if self.iterations % self.args.rl_to_ea_synch_period == 0:
@@ -173,33 +193,35 @@ class Agent:
         return {
             'best_train_fitness': best_train_fitness,
             'test_score': test_score,
+            'test_sd': test_sd,
+            'pop_avg': population_avg,
             'elite_index': elite_index,
-            'ddpg_reward': testr,
+            'ddpg_reward': test_ddpg,
             'pg_loss': np.mean(losses['pgs_loss']),
             'bc_loss': np.mean(losses['bcs_loss']),
             'pop_novelty': np.mean(0),
         }
 
 
-class Archive:
-    """A record of past behaviour characterisations (BC) in the population"""
+# class Archive:
+#     """A record of past behaviour characterisations (BC) in the population"""
 
-    def __init__(self, args):
-        self.args = args
-        # Past behaviours
-        self.bcs = []
+#     def __init__(self, args):
+#         self.args = args
+#         # Past behaviours
+#         self.bcs = []
 
-    def add_bc(self, bc):
-        if len(self.bcs) + 1 > self.args.archive_size:
-            self.bcs = self.bcs[1:]
-        self.bcs.append(bc)
+#     def add_bc(self, bc):
+#         if len(self.bcs) + 1 > self.args.archive_size:
+#             self.bcs = self.bcs[1:]
+#         self.bcs.append(bc)
 
-    def get_novelty(self, this_bc):
-        if self.size() == 0:
-            return np.array(this_bc).T @ np.array(this_bc)
-        distances = np.ravel(distance.cdist(np.expand_dims(this_bc, axis=0), np.array(self.bcs), metric='sqeuclidean'))
-        distances = np.sort(distances)
-        return distances[:self.args.ns_k].mean()
+#     def get_novelty(self, this_bc):
+#         if self.size() == 0:
+#             return np.array(this_bc).T @ np.array(this_bc)
+#         distances = np.ravel(distance.cdist(np.expand_dims(this_bc, axis=0), np.array(self.bcs), metric='sqeuclidean'))
+#         distances = np.sort(distances)
+#         return distances[:self.args.ns_k].mean()
 
-    def size(self):
-        return len(self.bcs)
+#     def size(self):
+#         return len(self.bcs)

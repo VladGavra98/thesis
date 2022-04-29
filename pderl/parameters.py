@@ -58,7 +58,7 @@ class Parameters:
         self.batch_size = 128
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 100000
+        self.buffer_size = 10000
 
         if 'lunarlander' in cla.env.lower():
             self.ls = 32
@@ -129,5 +129,5 @@ class Parameters:
         if stdout:
             print(params)
 
-        with open(os.path.join(self.save_foldername, 'info.txt'), 'a') as f:
+        with open(os.path.join(self.save_foldername, 'info.txt'), 'w') as f:
             f.write(params)

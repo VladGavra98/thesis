@@ -8,10 +8,10 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (HalfCheetah-v2) (Ant-v2) (Reacher-v2) (Walker2d-v2) ' +
-                                 '(Swimmer-v2) (Hopper-v2)', type=str)
+                                 '(Swimmer-v2) (Hopper-v2)', type=str,default = 'LunarLanderContinuous-v2')
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
-parser.add_argument('-render', help='Render gym episodes', action='store_true')
-parser.add_argument('-model_path', help='Path to the model', type=str, required=False, default = 'pderl/logs/evo_net.pkl')
+parser.add_argument('-render', help='Render gym episodes', action='store_true', default = False)
+parser.add_argument('-model_path', help='Path to the model', type=str, required=False, default = 'logs/evo_net.pkl')
 args = parser.parse_args()
 
 
@@ -33,8 +33,8 @@ def evaluate(agent, env, trials=1, render=False):
 
         results.append(total_reward)
 
-    print("Reward:", np.mean(results))
-
+    # print("Mean Reward:", np.mean(results))
+    return results
 
 def load_genetic_agent(args):
     actor_path = os.path.join(args.model_path)
@@ -45,9 +45,9 @@ def load_genetic_agent(args):
 
 
 if __name__ == "__main__":
-    env_name = 'LunarLanderContinuous-v2'
-    env = utils.NormalizedActions(gym.make(env_name))
-    # env = utils.NormalizedActions(gym.make(args.env))
+    # env_name = 'LunarLanderContinuous-v2'
+    # env = utils.NormalizedActions(gym.make(env_name))
+    env = utils.NormalizedActions(gym.make(args.env))
 
     parameters = Parameters(None, init=False)
     parameters.individual_bs = 0
@@ -56,10 +56,16 @@ if __name__ == "__main__":
     parameters.use_ln = True
     parameters.device = torch.device('cuda')
     setattr(parameters, 'model_path', args.model_path)
+    setattr(parameters, 'ls', 32)
+    print("Model loaded from: "+ parameters.model_path)
 
     #Seed
     env.seed(args.seed)
     torch.manual_seed(args.seed); np.random.seed(args.seed); random.seed(args.seed)
 
     agent = load_genetic_agent(parameters)
-    evaluate(agent, env, render=args.render)
+    rewards = evaluate(agent, env, render=args.render, trials = 100)
+
+    print(f'Mean reward: {np.mean(rewards):.2f}\nDeviation:    {np.std(rewards):.2f}')
+
+

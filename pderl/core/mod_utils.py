@@ -9,15 +9,21 @@ import gym
 
 class Tracker:
     def __init__(self, parameters, vars_string, project_string):
-        self.vars_string = vars_string; self.project_string = project_string
+        self.vars_string = vars_string
+        self.project_string = project_string
         self.foldername = parameters.save_foldername
-        self.all_tracker = [[[],0.0,[]] for _ in vars_string] # [Id of var tracked][fitnesses, avg_fitness, csv_fitnesses]
+        self.all_tracker = [ [[],0.0,[]] for _ in vars_string] # [Id of var tracked][fitnesses, avg_fitness, csv_fitnesses]
         self.counter = 0
         self.conv_size = 10
         if not os.path.exists(self.foldername):
             os.makedirs(self.foldername)
 
     def update(self, updates, generation):
+        """ Update the logger.
+        Args:
+            updates (list): Variables to add to logger.
+            generation (int): Counter (time passed/ frames/ games)
+        """
         self.counter += 1
         for update, var in zip(updates, self.all_tracker):
             if update == None: continue
