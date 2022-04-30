@@ -7,8 +7,7 @@ import gym
 import argparse
 import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
-parser.add_argument('-env', help='Environment Choices: (HalfCheetah-v2) (Ant-v2) (Reacher-v2) (Walker2d-v2) ' +
-                                 '(Swimmer-v2) (Hopper-v2)', type=str,default = 'LunarLanderContinuous-v2')
+parser.add_argument('-env', help='Environment Choice', type=str,default = 'LunarLanderContinuous-v2')
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-render', help='Render gym episodes', action='store_true', default = False)
 parser.add_argument('-load_champion', help='Loads the best performingactor', action='store_true', default = False)
@@ -17,7 +16,7 @@ args = parser.parse_args()
 plt.style.use('ggplot') 
 plt.rcParams.update({'font.size': 12})
 
-def evaluate(agent, env, trials : int = 10, render : bool =False):
+def evaluate(agent, env, trials : int = 10, render : bool =False, broken_engine : bool =False):
     """ Evaualte an individual for a couple of trails/games.
 
     Args:
@@ -42,9 +41,14 @@ def evaluate(agent, env, trials : int = 10, render : bool =False):
         done = False
         while not done:
             if render: env.render()
+
+            # Actor:
             action = agent.actor.select_action(np.array(state))
 
             # Simulate one step in environment
+            if broken_engine:
+                action[0] = np.clip(action[0], -1., 0.5)
+
             next_state, reward, done, info = env.step(action.flatten())
             total_reward += reward
             state = next_state
@@ -74,10 +78,9 @@ def evaluate(agent, env, trials : int = 10, render : bool =False):
 
 
 
-def load_genetic_agent(args, load_champion : bool = False):
-    actor_path = os.path.join(args.model_path)
+def load_genetic_agent(args, model_path : str, elite_path : str = None):
+    actor_path = os.path.join(model_path)
     agents_pop = []
-
     checkpoint = torch.load(actor_path)
 
     for _,model in checkpoint.items():
@@ -85,11 +88,22 @@ def load_genetic_agent(args, load_champion : bool = False):
         agent.actor.load_state_dict(model)
         agents_pop.append(agent)
 
-    if load_champion:
+    if elite_path:
         agent.actor.load_state_dict(torch.load(elite_path))
-    print("Model loaded from: " + parameters.model_path)
+    print("Model loaded from: " + model_path)
 
     return agents_pop
+    
+def load_rl_agent(args, model_path : str = 'ddpg/logs/evo_net.pkl'):
+    actor_path = os.path.join(model_path)
+
+    agent = GeneticAgent(args)
+    agent.actor.load_state_dict(torch.load(actor_path))
+
+    print("Model loaded from: " + model_path)
+
+    return agent
+
 
 def gen_heatmap(bcs_map : np.ndarray, rewards : np.ndarray, filename : str, save_figure : bool = False):
     """Saves a heatmap of the optimizer's archive to the filename.
@@ -115,9 +129,12 @@ def gen_heatmap(bcs_map : np.ndarray, rewards : np.ndarray, filename : str, save
 
 if __name__ == "__main__":
 
-    env = utils.NormalizedActions(gym.make(args.env))
+    env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
+
     model_path = 'pderl/logs/evo_nets.pkl'
     elite_path = 'pderl/logs/elite_net.pkl'
+    ddpg_path =  'pderl/logs_ddpg/ddpg_net.pkl'
+
 
     parameters = Parameters(args, init=False)
     parameters.individual_bs = 0
@@ -125,22 +142,27 @@ if __name__ == "__main__":
     parameters.state_dim = env.observation_space.shape[0]
     parameters.use_ln = True
     parameters.device = torch.device('cuda')
-    setattr(parameters, 'model_path', model_path)
-    setattr(parameters, 'elite_path', elite_path)
     setattr(parameters, 'ls', 32)
     
     #Seed
     env.seed(args.seed); torch.manual_seed(args.seed); np.random.seed(args.seed); random.seed(args.seed)
 
     # Load popualtion for evaluation:
-    agents_pop = load_genetic_agent(parameters)
-    rewards,bcs_map = [],[]
-    for agent in agents_pop:
-        reward_mean,reward_std, bcs = evaluate(agent, env, render=args.render, trials = 2)
-        rewards.append(reward_mean); bcs_map.append(bcs)
-    rewards = np.asarray(rewards); bcs_map = np.asarray(bcs_map)
+    # agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    # rewards,bcs_map = [],[]
+    # for agent in agents_pop:
+    #     reward_mean,reward_std, bcs = evaluate(agent, env, render=args.render, trials = 2)
+    #     rewards.append(reward_mean); bcs_map.append(bcs)
+    # rewards = np.asarray(rewards); bcs_map = np.asarray(bcs_map)
+
+    # Load RL agent:
+    rl_agent = load_rl_agent(parameters,ddpg_path)
+    reward_mean,reward_std, bcs = evaluate(rl_agent, env, \
+        render=args.render, trials = 100, broken_engine=True)
+    
+    print(reward_mean, reward_std)
 
     # Plotting
-    gen_heatmap(bcs_map, rewards, filename='Results_pderl/Plots/population_map.png')
+    # gen_heatmap(bcs_map, rewards, filename='Results_pderl/Plots/population_map.png')
 
 

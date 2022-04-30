@@ -14,12 +14,13 @@
 - [x] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
 - [x] Adapt PD-ERL for LunarLander (continuous)
 - [ ] Test QD learned polices on damaged lunar lander. It is very interesting to see how well they perform before any online learning.
-- [ ] Find out what the batch_size is in QD
+- [x] Find out what the batch_size is in QD
 
 > week9: 16/04 - 22/04
 - [] Make table for overview of ERL, DRL and QD.
-- [] Find out how to make a NN policy in pyribs
-    - [] Implement a NN policy in pyribs on LuanrLander
+- [] Run PD-ERL again for 1.2mil frames BUT with different synchornisation
+- [] Write the damaged LunarLnader
+
 
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
 ## Report Writing:
