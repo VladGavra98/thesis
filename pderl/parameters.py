@@ -19,9 +19,12 @@ class Parameters:
         self.render = cla.render
         self.env_name = cla.env
         self.save_periodic = cla.save_periodic if cla.save_periodic else False
+
         # Number of Frames to Run
-        self.num_games = cla.num_games
-        
+        if  cla.frames:
+            self.num_frames = cla.frames
+        else:
+            self.num_frames = 1000000
         # if cla.env == 'Hopper-v2':
         #     self.num_frames = 1500000
         # elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':

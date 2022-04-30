@@ -1,8 +1,13 @@
 import json
 import matplotlib.pyplot as plt
 from ribs.visualize import grid_archive_heatmap
+import numpy as np
 
-plt.rcParams.update({'font.size': 16})
+plt.style.use('ggplot') 
+plt.rcParams.update({'font.size': 12})
+
+
+
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #                       Saving Log Contents Utils 

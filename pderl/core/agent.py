@@ -44,7 +44,7 @@ class Agent:
         # Trackers
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
     
-    @staticmethod
+
     def evaluate(self,agent: ddpg.GeneticAgent or ddpg.DDPG, is_render=False, is_action_noise=False,
                  store_transition=True) -> tuple:
         """ Play one game to evaualute the agent.
@@ -159,7 +159,7 @@ class Agent:
         test_scores = []
         for _ in range(self.validation_tests):
             # do NOT  store these trials
-            episode = Agent.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
+            episode = self.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
             test_scores.append(episode['reward'])
         test_score = np.average(test_scores)
         test_sd = np.std(test_scores)
@@ -232,13 +232,60 @@ class Agent_ddpg:
         # Trackers
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
 
+    def evaluate(self,agent: ddpg.GeneticAgent or ddpg.DDPG, is_render=False, is_action_noise=False,
+                 store_transition=True) -> tuple:
+        """ Play one game to evaualute the agent.
+
+        Args:
+            agent (ddpg.GeneticAgentorddpg.DDPG): Agent class. 
+            is_render (bool, optional): Show render. Defaults to False.
+            is_action_noise (bool, optional): Add OU noise to action. Defaults to False.
+            store_transition (bool, optional): Add frames to memory buffer. Defaults to True.
+
+        Returns:
+            tuple: Reward, temporal difference error
+        """
+        total_reward = 0.0
+        total_error = 0.0
+
+        state = self.env.reset()
+        done = False
+
+        while not done:
+            # play one 'game'
+            if self.args.render and is_render: 
+                self.env.render()
+
+            action = agent.actor.select_action(np.array(state))
+            if is_action_noise:
+                action += self.ounoise.noise()
+                action = np.clip(action, -1.0, 1.0)
+
+            # Simulate one step in environment
+            next_state, reward, done, info = self.env.step(action.flatten())
+            total_reward += reward
+
+            # Add experiences to buffer:
+            if store_transition:
+                transition = (state, action, next_state, reward, float(done))
+                self.num_frames += 1; self.gen_frames += 1
+
+                self.replay_buffer.add(*transition)
+                agent.buffer.add(*transition)
+            state = next_state
+
+        # updated games if is done
+        if store_transition: 
+            self.num_games += 1
+
+        return {'reward': total_reward, 'td_error': total_error}
 
     def train_ddpg(self):
         bcs_loss, pgs_loss = [], []
         if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
             for _ in range(int(self.gen_frames * self.args.frac_frames_train)):
+                
                 batch = self.replay_buffer.sample(self.args.batch_size)
-
                 pgl, delta = self.rl_agent.update_parameters(batch)
                 pgs_loss.append(pgl)
 
@@ -249,8 +296,8 @@ class Agent_ddpg:
         self.iterations += 1
 
         # Collect experience for training
-        Agent.evaluate(self,self.rl_agent, is_action_noise=True)
-
+        ddpg_stats = self.evaluate(self.rl_agent, is_action_noise=True)
+        
         # Pass over the experiences:
         losses = self.train_ddpg()
 
@@ -259,11 +306,11 @@ class Agent_ddpg:
         if self.iterations % self.validation_freq ==0:
             tests_ddpg = []
             for _ in range(self.validation_tests):
-                ddpg_stats = Agent.evaluate(self,self.rl_agent, store_transition=False, is_action_noise=False)
+                ddpg_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
                 tests_ddpg.append(ddpg_stats['reward'])
             ddpg_reward = np.average(tests_ddpg)
             ddpg_std = np.std(tests_ddpg)
-
+            
 
             # -------------------------- Collect statistics --------------------------
             return {

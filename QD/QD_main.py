@@ -96,7 +96,7 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
              if seed is None else [seed + i for i in range(n_emitters)])
     initial_model = np.zeros((action_dim, obs_dim))
     emitters = [
-        RandomDirectionEmitter(
+        ImprovementEmitter(
             archive,
             initial_model.flatten(),
             sigma0=sigma0,
@@ -180,7 +180,7 @@ def run_search(client, optimizer, env_seed, iterations, log_freq):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #                              Test Traiend Policies 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def run_evaluation(outdir, env_seed, random : bool = False):
+def run_evaluation(outdir, env_seed = 1339, random : bool = False, do_plot : bool= False, do_ranking : bool= False):
     """Simulates 10 random archive solutions and saves videos of them.
 
     Videos are saved to outdir / videos.
@@ -190,10 +190,15 @@ def run_evaluation(outdir, env_seed, random : bool = False):
             retrieve the archive and save videos.
         env_seed (int): Seed for the environment.
     """
+    outdir = Path(outdir)
     df = pd.read_csv(outdir / "archive.csv")
+    print(df)
+
     if random: indices = np.random.permutation(len(df))[:10]
     else:      indices = range(len(df))
 
+    if do_plot:
+        save_heatmap(df, str(outdir / "heatmap.png"))
     # Use a single env so that all the videos go to the same directory.
     print(env_name)
     video_env = gym.wrappers.Monitor(
@@ -206,29 +211,30 @@ def run_evaluation(outdir, env_seed, random : bool = False):
         video_callable=lambda idx: True,
     )
 
-    MAX_REWARD = 200; max_idx = 0
-    for idx in tqdm(indices):
-        model = np.array(df.loc[idx, "solution_0":])
-        reward, impact_x_pos, impact_y_vel = simulate(model, env_name, env_seed,
-                                                      video_env=None)
+    if do_ranking:
+        MAX_REWARD = 200; max_idx = 0
+        for idx in tqdm(indices):
+            model = np.array(df.loc[idx, "solution_0":])
+            reward, impact_x_pos, impact_y_vel = simulate(model, env_name, env_seed,
+                                                        video_env=None)
 
-        if reward > MAX_REWARD:
-            print(f"Max reward {reward:0.3} at index = {idx}")
-            best_model = model
-            MAX_REWARD = reward
-            max_idx = idx
-            
-    # simulate again the best, this time with video
-    reward, impact_x_pos, impact_y_vel = simulate(best_model, env_name, env_seed,
-                                                    video_env=video_env) 
+            if reward > MAX_REWARD:
+                print(f"Max reward {reward:0.3} at index = {idx}")
+                best_model = model
+                MAX_REWARD = reward
+                max_idx = idx
+                
+        # simulate again the best, this time with video
+        reward, impact_x_pos, impact_y_vel = simulate(best_model, env_name, env_seed,
+                                                        video_env=video_env) 
 
-    assert int(reward) == int(MAX_REWARD) , f"Different rewards:{reward}, {MAX_REWARD}"                                          
-    print(f"=== Index {max_idx} ===\n"
-            "Model:\n"
-            f"{model}\n"
-            f"Reward: {reward}\n"
-            f"Impact x-pos: {impact_x_pos}\n"
-            f"Impact y-vel: {impact_y_vel}\n")
+        assert int(reward) == int(MAX_REWARD) , f"Different rewards:{reward}, {MAX_REWARD}"                                          
+        print(f"=== Index {max_idx} ===\n"
+                "Model:\n"
+                f"{model}\n"
+                f"Reward: {reward}\n"
+                f"Impact x-pos: {impact_x_pos}\n"
+                f"Impact y-vel: {impact_y_vel}\n")
 
     video_env.close()
 
@@ -244,8 +250,7 @@ def lunar_lander_main(workers=4,
                       batch_size=25,
                       sigma0=1.0,
                       seed=None,
-                      outdir="lunar_lander_output",
-                      run_eval=False):
+                      outdir="lunar_lander_output"):
     """Uses CMA-ME to train linear agents in Lunar Lander.
 
     Args:
@@ -266,9 +271,6 @@ def lunar_lander_main(workers=4,
     outdir = Path(outdir)
     outdir.mkdir(exist_ok=True)
 
-    if run_eval:
-        run_evaluation(outdir, env_seed)
-        return None
 
     # Setup Dask. The client connects to a "cluster" running on this machine.
     # The cluster simply manages several concurrent worker processes. If using
@@ -297,10 +299,10 @@ def lunar_lander_main(workers=4,
 
 if __name__ == "__main__":
     # Declare folder for results
-    outdir_path = './Results_QD/run4_continuous_highD'
+    outdir_path = './Results_QD/run6_continuous_balanced'
 
     # Train
-    # lunar_lander_main(outdir=outdir_path, workers = 5)
+    lunar_lander_main(outdir=outdir_path, workers = 5)
 
     # Evaluate
-    lunar_lander_main(outdir=outdir_path,run_eval=True)
+    run_evaluation(outdir=outdir_path, do_ranking= False, do_plot=True)

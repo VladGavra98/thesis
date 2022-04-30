@@ -4,11 +4,14 @@ import gym, torch
 import argparse
 from parameters import Parameters
 
+num_games = 10
+num_frames = num_games * 200
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
-parser.add_argument('-num_games', help = 'Number of complete games to play', default = 5000)
-#  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
+parser.add_argument('-num_games', help = 'Number of complete games to play', default = 10)
+# parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
+parser.add_argument('-num_frames', help = 'Number of frames to learn from', default = num_frames)
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
@@ -27,7 +30,7 @@ parser.add_argument('-logdir', help='Folder where to save results', type=str, de
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-opstat_freq', help='Frequency (in generations) to store operator statistics', type=int, default=1)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
-parser.add_argument('-next_save', help='Generation save frequency for save_periodic', type=int, default=500)
+parser.add_argument('-next_save', help='Generation save frequency for save_periodic', type=int, default=num_games//10)
 parser.add_argument('-test_operators', help='Runs the operator runner to test the operators', action='store_true')
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -47,7 +50,7 @@ if __name__ == "__main__":
     parameters.state_dim = env.observation_space.shape[0]
 
     # Write the parameters to a the info file and print them
-    parameters.write_params(stdout=True)
+    parameters.write_params(stdout=False)
 
     # Seed
     env.seed(parameters.seed)
@@ -87,9 +90,12 @@ if __name__ == "__main__":
         if agent.num_games > next_save:
             next_save += parameters.next_save
             torch.save(agent.rl_agent.actor.state_dict(), os.path.join(parameters.save_foldername,
-                                                                                   'evo_net.pkl'))
+                                                                                   'ddpg_net.pkl'))
 
             print("Progress Saved")
+
+    torch.save(agent.rl_agent.actor.state_dict(), os.path.join(parameters.save_foldername,
+                                                                                   'ddpg_net.pkl'))
 
 
 

@@ -31,7 +31,7 @@
     'render': False,
     'replace_old': True,
     'rl_to_ea_synch_period': 2,
-    'save_foldername': 'pderl/logs_ddpg',
+    'save_foldername': '/content/gdrive/MyDrive/pderl/logs_ddpg',
     'save_periodic': False,
     'seed': 7,
     'state_dim': 8,

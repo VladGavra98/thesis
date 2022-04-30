@@ -38,7 +38,6 @@ class Tracker:
             if len(var[0]) == 0: continue
             var[1] = sum(var[0])/float(len(var[0]))
 
-        # logging freq at 1/4 of updating freq.
         if self.counter:  # Save to csv file
             for i, var in enumerate(self.all_tracker):
                 if len(var[0]) == 0: continue
@@ -151,13 +150,6 @@ class NormalizedActions(gym.ActionWrapper):
         action += self.action_space.low
         return action
     
-    
-
-    # def _reverse_action(self, action):
-    #     action -= self.action_space.low
-    #     action /= (self.action_space.high - self.action_space.low)
-    #     action = action * 2 - 1
-    #     return action
 
 
 def fanin_init(size, fanin=None):
