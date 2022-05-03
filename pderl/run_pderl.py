@@ -7,14 +7,14 @@ from core.operator_runner import OperatorRunner
 from parameters import Parameters
 
 '''                           Globals                                                        '''
-num_games = 10
+num_games = 5000
 num_frames = num_games * 200
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
 # parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
-parser.add_argument('-num_frames', help = 'Number of frames to learn from', default = num_frames)
+parser.add_argument('-frames', help = 'Number of frames to learn from', default = num_frames)
 #  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')

@@ -36,10 +36,10 @@ class Parameters:
         # # NOTE reduced number of total frames
 
         # Synchronization
-        if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2':
+        if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2'or 'lunar' in cla.env.lower():
             self.rl_to_ea_synch_period = 1
         else:
-            self.rl_to_ea_synch_period = 2
+            self.rl_to_ea_synch_period = 3
 
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
@@ -62,7 +62,7 @@ class Parameters:
         self.use_done_mask = True
         self.buffer_size = 10000
 
-        if 'lunarlander' in cla.env.lower():
+        if 'lunarlander' or 'car' in cla.env.lower():
             self.ls = 32
         else:
             self.ls = 128
@@ -84,10 +84,10 @@ class Parameters:
         elif cla.env == 'Walker2d-v2':
             self.num_evals = 5
         else:
-            self.num_evals = 1
+            self.num_evals = 3
 
         # Elitism Rate
-        if cla.env == 'Reacher-v2' or cla.env == 'Walker2d-v2' or cla.env == 'Ant-v2' or cla.env == 'Hopper-v2':
+        if cla.env == 'Reacher-v2' or cla.env == 'Walker2d-v2' or cla.env == 'Ant-v2' or cla.env == 'Hopper-v2' or 'lunar' in cla.env.lower():
             self.elite_fraction = 0.2
         else:
             self.elite_fraction = 0.1

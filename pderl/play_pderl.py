@@ -148,21 +148,24 @@ if __name__ == "__main__":
     env.seed(args.seed); torch.manual_seed(args.seed); np.random.seed(args.seed); random.seed(args.seed)
 
     # Load popualtion for evaluation:
-    # agents_pop = load_genetic_agent(parameters, model_path, elite_path)
-    # rewards,bcs_map = [],[]
-    # for agent in agents_pop:
-    #     reward_mean,reward_std, bcs = evaluate(agent, env, render=args.render, trials = 2)
-    #     rewards.append(reward_mean); bcs_map.append(bcs)
-    # rewards = np.asarray(rewards); bcs_map = np.asarray(bcs_map)
-
-    # Load RL agent:
-    rl_agent = load_rl_agent(parameters,ddpg_path)
-    reward_mean,reward_std, bcs = evaluate(rl_agent, env, \
-        render=args.render, trials = 100, broken_engine=True)
+    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    rewards,bcs_map = [],[]
+    for agent in agents_pop:
+        reward_mean,reward_std, bcs = evaluate(agent, env, render=args.render, trials = 2)
+        rewards.append(reward_mean); bcs_map.append(bcs)
+    rewards = np.asarray(rewards); bcs_map = np.asarray(bcs_map)
+    print(rewards)
     
-    print(reward_mean, reward_std)
+    ## Plotting
+    gen_heatmap(bcs_map, rewards, filename='Results_pderl/Plots/population_map.png')
 
-    # Plotting
-    # gen_heatmap(bcs_map, rewards, filename='Results_pderl/Plots/population_map.png')
+    # ---------------------------------------------------------------------
+    # Load RL agent:
+    # rl_agent = load_rl_agent(parameters,ddpg_path)
+    # reward_mean,reward_std, bcs = evaluate(rl_agent, env, \
+    #     render=args.render, trials = 100, broken_engine=True)
+    
+    # print(reward_mean, reward_std)
+
 
 
