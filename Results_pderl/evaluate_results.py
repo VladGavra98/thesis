@@ -2,18 +2,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('ggplot') 
 plt.rcParams.update({'font.size': 12})
+plt.rcParams['figure.dpi'] = 140
+# plt.rcParams['figure.figsize'] = [6, 5]
+
 
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']  
-
+color_ddpg = colors[2]
+color_erl = colors[0]
 def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     fig1,ax = plt.subplots()
     fig1.canvas.manager.set_window_title("Reward versus frames")
     # ax.set_title("Average Reward - LunarLander", pad=20)
-    ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = colors[2])
-    ax.fill_between(games_ddpg, ddpg_score - ddpg_std, ddpg_score+ ddpg_std, color=colors[2],alpha=0.4)
+    ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = color_ddpg)
+    ax.fill_between(games_ddpg, ddpg_score - ddpg_std, ddpg_score+ ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(games_ddpg, erl_score, label = 'PD-ERL', color=colors[0])
-    ax.fill_between(games_ddpg, erl_score - erl_std, erl_score+ erl_std, color=colors[0], alpha=0.4)
+    ax.plot(games_ddpg, erl_score, label = 'PD-ERL', color=color_erl)
+    ax.fill_between(games_ddpg, erl_score - erl_std, erl_score+ erl_std, color=color_erl, alpha=0.4)
     ax.set_ylabel("Reward [-]")
     ax.set_xlabel(r"Games [-]")
     ax.legend(loc = 'lower right')
@@ -28,11 +32,11 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
     fig2,ax = plt.subplots()
     fig2.canvas.manager.set_window_title("Reward versus games")
     # ax.set_title("Average Reward - LunarLander", pad=20)
-    ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=colors[2])
-    ax.fill_between(frames_ddpg//f2e, ddpg_score - ddpg_std, ddpg_score + ddpg_std, color=colors[2],alpha=0.4)
+    ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=color_ddpg)
+    ax.fill_between(frames_ddpg//f2e, ddpg_score - ddpg_std, ddpg_score + ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(frames_ddpg//f2e, erl_score, label = 'PD-ERL', color=colors[0])
-    ax.fill_between(frames_ddpg//f2e, erl_score - erl_std, erl_score + erl_std, color=colors[0], alpha=0.4)
+    ax.plot(frames_ddpg//f2e, erl_score, label = 'PD-ERL', color=color_erl)
+    ax.fill_between(frames_ddpg//f2e, erl_score - erl_std, erl_score + erl_std, color=color_erl, alpha=0.4)
     ax.set_ylabel("Reward [-]")
     ax.set_xlabel(r"Epochs [$10^4$ frames]")
     ax.legend(loc = 'lower right')
@@ -41,6 +45,38 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 
     return fig2, ax
 
+def plot_fault_tolerancy():
+    erl_r = 251.25; erl_std = 26.31
+    ddpg_r = 140; ddpg_std = 110.31
+    erl_r_faulty = 207.22; erl_std_faulty = 104.17
+    ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
+
+
+    labels = ('PD-ERL', 'DDPG')
+    nominal_r= [erl_r, ddpg_r]; nominal_std = [erl_std,ddpg_std]
+    faulty_r = [erl_r_faulty, ddpg_r_faulty]; faulty_std = [erl_std_faulty,ddpg_std_faulty]
+
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal')
+    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.bar_label(rects1, labels=[f'{e:.1f}' for e in nominal_std],
+             padding=2, fontsize=14)
+    ax.bar_label(rects2, labels=[f'{e:.1f}' for e in faulty_std],
+             padding=2, fontsize=14)
+
+    ax.set_ylabel('Rewards [-]')
+    # ax.set_title('')
+    ax.set_xticks(x, labels)
+    ax.legend()
+
+    fig.tight_layout()
+    fig.savefig('Results_pderl/Plots/reward_games.png')
+
 
 #-----------------------------------------------------------------------------
 
@@ -48,9 +84,11 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 logs = 'pderl/logs_s1_e3_buffer5e04'
 logs_ddpg = 'pderl/logs_ddpg'
 
+# ddpg
 ddpg_score = np.genfromtxt(logs_ddpg+ '/ddpg_reward_frames.csv', skip_header= 1, delimiter=',')
 ddpg_std = np.genfromtxt(logs_ddpg + '/ddpg_std_games.csv', skip_header= 1, delimiter=',')
 
+# erl
 erl_score = np.genfromtxt(logs + '/erl_frames.csv', skip_header= 1, delimiter=',')
 erl_std   = np.genfromtxt(logs + '/erl_std_games.csv', skip_header= 1, delimiter=',')
 
@@ -84,5 +122,6 @@ do_plot = True
 if do_plot:
     plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
     plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
-
+    plot_fault_tolerancy()
     plt.show()
+
