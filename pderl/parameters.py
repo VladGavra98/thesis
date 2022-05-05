@@ -60,7 +60,7 @@ class Parameters:
         self.batch_size = 128
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 10000
+        self.buffer_size = 50000
 
         if 'lunarlander' or 'car' in cla.env.lower():
             self.ls = 32
