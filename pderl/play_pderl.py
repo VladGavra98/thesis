@@ -44,7 +44,6 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: 
         all_y_vels = []
 
         done = False
-
         state = env.reset()
         done = False
         while not done:
@@ -59,9 +58,11 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: 
                 action[0] = np.clip(action[0], -1., 0.5)
 
             next_state, reward, done, info = env.step(action.flatten())
+
             total_reward += reward
             state = next_state
 
+            # Boudnary characteristics:
             x_pos = state[0]
             y_vel = state[3]
             leg0_touch = bool(state[6])

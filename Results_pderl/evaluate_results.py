@@ -9,6 +9,9 @@ plt.rcParams['figure.dpi'] = 140
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']  
 color_ddpg = colors[2]
 color_erl = colors[0]
+
+savefig = False
+
 def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     fig1,ax = plt.subplots()
     fig1.canvas.manager.set_window_title("Reward versus frames")
@@ -48,7 +51,7 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 def plot_fault_tolerancy():
     erl_r = 251.25; erl_std = 26.31
     ddpg_r = 140; ddpg_std = 110.31
-    erl_r_faulty = 207.22; erl_std_faulty = 104.17
+    erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
 
 
@@ -75,7 +78,8 @@ def plot_fault_tolerancy():
     ax.legend()
 
     fig.tight_layout()
-    fig.savefig('Results_pderl/Plots/reward_games.png')
+    if savefig:
+        fig.savefig('Results_pderl/Plots/reward_games.png')
 
 
 #-----------------------------------------------------------------------------
@@ -120,8 +124,8 @@ erl_std   = np.interp(frames_ddpg, frames_erl, erl_std[:,1])
 # Plotting:
 do_plot = True
 if do_plot:
-    plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
-    plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
+    # plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
+    # plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
     plot_fault_tolerancy()
     plt.show()
 
