@@ -13,7 +13,7 @@ class Parameters:
         if not cla.disable_cuda and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
-            self.device = torch.device('cpfu')
+            self.device = torch.device('cpu')
 
         # Render episodes
         self.render = cla.render

@@ -9,6 +9,10 @@ import gym
 import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+# my envs
+import envs.lunarlander
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choice',
                     type=str, default='LunarLanderContinuous-v2')

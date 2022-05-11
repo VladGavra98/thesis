@@ -45,7 +45,7 @@ Help:
     python lunar_lander.py --help
 """
 # basic OS interaction
-import time, os, sys
+import time
 from pathlib import Path
 
 # python standard modules for AI
@@ -61,9 +61,8 @@ from ribs.emitters import ImprovementEmitter, OptimizingEmitter, RandomDirection
 from ribs.optimizers import Optimizer
 
 # my modules
-import QD
 from QD.saving_utils import *
-from envs.lunar_lander import simulate 
+from envs.lunarlander import simulate 
 
 
 
