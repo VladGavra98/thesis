@@ -55,13 +55,15 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 def plot_fault_tolerancy():
     erl_r = 251.25; erl_std = 26.31
     ddpg_r = 140; ddpg_std = 110.31
+    qd_r = 250; qd_std = 10
+    # borken engine fault
     erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
+    qd_r_faulty = 44.25; qd_std_faulty = 150.30
 
-
-    labels = ('PD-ERL', 'DDPG')
-    nominal_r= [erl_r, ddpg_r]; nominal_std = [erl_std,ddpg_std]
-    faulty_r = [erl_r_faulty, ddpg_r_faulty]; faulty_std = [erl_std_faulty,ddpg_std_faulty]
+    labels = ('PD-ERL', 'DDPG', 'QD')
+    nominal_r= [erl_r, ddpg_r,qd_r]; nominal_std = [erl_std,ddpg_std, qd_std]
+    faulty_r = [erl_r_faulty, ddpg_r_faulty,qd_r_faulty]; faulty_std = [erl_std_faulty,ddpg_std_faulty, qd_std_faulty]
 
     x = np.arange(len(labels))  # the label locations
     width = 0.35  # the width of the bars

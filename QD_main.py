@@ -193,7 +193,7 @@ def run_search(client, optimizer, env_seed, iterations, log_freq):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #                              Test Traiend Policies 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def run_evaluation(outdir, env_seed = 1339, random : bool = False, do_plot : bool= False, do_ranking : bool= False):
+def run_evaluation(outdir, env_seed = 1339, random : bool = False, broken_engine : bool= False, trials : bool= 5):
     """Simulates 10 random archive solutions and saves videos of them.
 
     Videos are saved to outdir / videos.
@@ -213,7 +213,11 @@ def run_evaluation(outdir, env_seed = 1339, random : bool = False, do_plot : boo
     # if do_plot:
     #     save_heatmap(df, str(outdir / "heatmap.png"))
     # Use a single env so that all the videos go to the same directory.
-    print('Environment: '+ env_name)
+    if broken_engine:
+        print('Environment: '+ env_name + ' broken engine')
+    else:
+      print('Environment: '+ env_name)
+
 
     # Since we are using multiple processes, it is simpler if each worker
     # just creates their own copy of the environment instead of trying to
@@ -234,32 +238,34 @@ def run_evaluation(outdir, env_seed = 1339, random : bool = False, do_plot : boo
         env.seed(env_seed)
 
 
-    if do_ranking:
-        print(f'Evaluate archive:')
-        MAX_REWARD = 200; max_idx = 0
-        for idx in tqdm(indices):
-            model = np.array(df.loc[idx, "solution_0":])
-            actor = QD_agent(model, env)   #wrap the model in an agent class
-            reward, impact_x_pos, impact_y_vel = simulate(actor, env, render = False)
+    print(f'Evaluate archive:')
+    MAX_REWARD = 200; max_idx = 0
+    for idx in tqdm(indices):
+        model = np.array(df.loc[idx, "solution_0":])
+        actor = QD_agent(model, env)   #wrap the model in an agent class
+        reward, impact_x_pos, impact_y_vel = simulate(actor, env, broken_engine = broken_engine, render = False)
 
-            if reward > MAX_REWARD:
-                print(f"Max reward {reward:0.3} at index = {idx}")
-                elite_actor= actor
-                MAX_REWARD = reward
-                max_idx = idx
-                
-        # simulate again the best, this time with video
-        reward, impact_x_pos, impact_y_vel = simulate(elite_actor, video_env, render = True)
+        if reward > MAX_REWARD:
+            print(f"Max reward {reward:0.3} at index = {idx}")
+            elite_actor= actor
+            MAX_REWARD = reward
+            max_idx = idx
+            
+    # simulate again the best, this time with video
+    print(f'\nEvaluating elite (agent {max_idx})...')
+    rewards, bcs = [], [] 
+    for _ in tqdm(range(trials)):
+      reward, impact_x_pos, impact_y_vel = simulate(elite_actor, env,broken_engine= broken_engine, render = False)
+      rewards.append(reward)
+      bcs.append((impact_x_pos, impact_y_vel))
 
-        assert int(reward) == int(MAX_REWARD) , f"Different rewards:{reward}, {MAX_REWARD}"                                          
-        print(f"=== Index {max_idx} ===\n"
-                "Model:\n"
-                f"{model}\n"
-                f"Reward: {reward}\n"
-                f"Impact x-pos: {impact_x_pos}\n"
-                f"Impact y-vel: {impact_y_vel}\n")
+    bcs = np.asarray(bcs)
 
+    simulate(elite_actor, video_env,broken_engine= broken_engine, render = True)                              
+    # close video env
     video_env.close()
+
+    return np.average(rewards), np.std(rewards), np.average(bcs, axis=0)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -328,4 +334,8 @@ if __name__ == "__main__":
     # lunar_lander_main(outdir=outdir_path, workers = 5)
 
     # Evaluate
-    run_evaluation(outdir=outdir_path, do_ranking= True, do_plot=True)
+    reward_mean, reward_std, bcs  = run_evaluation(outdir=outdir_path, trials =100, broken_engine = False)
+    print(f"Reward: {reward_mean:.2f}\n", 
+    f"Reward STD: {reward_std:.2f}\n", 
+                f"Impact x-pos: {bcs[0]:.2f}\n",
+                f"Impact y-vel: {bcs[1]:.2f}\n")
