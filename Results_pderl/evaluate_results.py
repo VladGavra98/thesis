@@ -25,7 +25,9 @@ def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     ax.set_xlabel(r"Games [-]")
     ax.legend(loc = 'lower right')
     fig1.tight_layout()
-    fig1.savefig('Results_pderl/Plots/reward_games.png')
+
+    if savefig:
+        fig1.savefig('Results_pderl/Plots/reward_games.png')
 
     return fig1, ax
 
@@ -44,7 +46,9 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
     ax.set_xlabel(r"Epochs [$10^4$ frames]")
     ax.legend(loc = 'lower right')
     fig2.tight_layout()
-    fig2.savefig('Results_pderl/Plots/reward_frames.png')
+
+    if savefig:
+        fig2.savefig('Results_pderl/Plots/reward_frames.png')
 
     return fig2, ax
 

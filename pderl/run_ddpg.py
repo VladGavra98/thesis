@@ -9,8 +9,7 @@ num_frames = num_games * 200
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
-parser.add_argument('-num_games', help = 'Number of complete games to play', default = 10)
-# parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
+# parser.add_argument('-num_games', help = 'Number of complete games to play', default = 10)
 parser.add_argument('-num_frames', help = 'Number of frames to learn from', default = num_frames)
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')

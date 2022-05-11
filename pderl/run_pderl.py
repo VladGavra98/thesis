@@ -2,8 +2,6 @@ import numpy as np, os, time, random
 from core import mod_utils as utils, agent
 import gym, torch
 import argparse
-import pickle
-from core.operator_runner import OperatorRunner
 from parameters import Parameters
 
 '''                           Globals                                                        '''

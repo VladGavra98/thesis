@@ -1,9 +1,9 @@
 import numpy as np
 import os
 import random
+from parameters import Parameters
 from core import mod_utils as utils
 from core.ddpg import GeneticAgent
-from parameters import Parameters
 import torch
 import gym
 import argparse
@@ -38,51 +38,55 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: 
     rewards, bcs = [], []
 
     for _ in range(trials):
-        total_reward = 0.0
-        impact_x_pos = None
-        impact_y_vel = None
-        all_y_vels = []
-
-        done = False
-        state = env.reset()
-        done = False
-        while not done:
-            if render:
-                env.render()
-
-            # Actor:
-            action = agent.actor.select_action(np.array(state))
-
-            # Simulate one step in environment
-            if broken_engine:
-                action[0] = np.clip(action[0], -1., 0.5)
-
-            next_state, reward, done, info = env.step(action.flatten())
-
-            total_reward += reward
-            state = next_state
-
-            # Boudnary characteristics:
-            x_pos = state[0]
-            y_vel = state[3]
-            leg0_touch = bool(state[6])
-            leg1_touch = bool(state[7])
-            all_y_vels.append(y_vel)
-
-            # Check if the lunar lander is impacting for the first time.
-            if impact_x_pos is None and (leg0_touch or leg1_touch):
-                impact_x_pos = x_pos
-                impact_y_vel = y_vel
-
-        if impact_x_pos is None:
-            impact_x_pos = x_pos
-            impact_y_vel = min(all_y_vels)
+        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, broken_engine)
 
         rewards.append(total_reward)
         bcs.append((impact_x_pos, impact_y_vel))
 
     bcs = np.asarray(bcs)
     return np.average(rewards), np.std(rewards), np.average(bcs, axis=0)
+
+def simulate(actor, env, render, broken_engine):
+    total_reward = 0.0
+    impact_x_pos = None
+    impact_y_vel = None
+    all_y_vels = []
+
+    done = False
+    state = env.reset()
+    done = False
+    while not done:
+        if render:
+            env.render()
+
+        # Actor:
+        action = actor.select_action(np.array(state))
+
+        # Simulate one step in environment
+        if broken_engine:
+            action[0] = np.clip(action[0], -1., 0.5)
+
+        next_state, reward, done, info = env.step(action.flatten())
+
+        total_reward += reward
+        state = next_state
+
+            # Boudnary characteristics:
+        x_pos = state[0]
+        y_vel = state[3]
+        leg0_touch = bool(state[6])
+        leg1_touch = bool(state[7])
+        all_y_vels.append(y_vel)
+
+            # Check if the lunar lander is impacting for the first time.
+        if impact_x_pos is None and (leg0_touch or leg1_touch):
+            impact_x_pos = x_pos
+            impact_y_vel = y_vel
+
+    if impact_x_pos is None:
+        impact_x_pos = x_pos
+        impact_y_vel = min(all_y_vels)
+    return total_reward,impact_x_pos,impact_y_vel
 
 
 def load_genetic_agent(args, model_path: str, elite_path: str = None):
@@ -161,13 +165,13 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    num_trials = 100
+    num_trials = 2
     # ------------------------------------------------------------------------
     #                                Elite agent
     # -> evalaute the best perforing controller on the nominal system
     # ------------------------------------------------------------------------
     elite_agent = load_rl_agent(parameters, elite_path)
-    reward_mean, reward_std, bcs = evaluate(elite_agent, env,
+    reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
                 render=args.render, trials=num_trials, broken_engine=False)
 
     print(f'Elite:{reward_mean:.2f}, {reward_std:.2f}\n')
@@ -179,7 +183,7 @@ if __name__ == "__main__":
     agents_pop = load_genetic_agent(parameters, model_path, elite_path)
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent, env,
+        r_mean, r_std, bcs = evaluate(agent.actor, env,
                 render=args.render, trials=num_trials, broken_engine=True)
         rewards.append(r_mean)
         bcs_map.append(bcs)
@@ -196,7 +200,7 @@ if __name__ == "__main__":
     #                                RL agent
     # ------------------------------------------------------------------------
     rl_agent = load_rl_agent(parameters, ddpg_path)
-    reward_mean, reward_std, bcs = evaluate(rl_agent, env,
+    reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
                 render=args.render, trials=num_trials, broken_engine=True)
 
     print(f'RL (ddpg):{reward_mean:.2f}, {reward_std:.2f}\n')
@@ -206,6 +210,6 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------
     # gen_heatmap(bcs_map, rewards, 
     #           filename='Results_pderl/Plots/population_map.png')
-    gen_heatmap(bcs_map, rewards,
-                filename='Results_pderl/Plots/population_map_broeknengine.png',\
-                save_figure = True)
+    # gen_heatmap(bcs_map, rewards,
+    #             filename='Results_pderl/Plots/population_map_broeknengine.png',\
+    #             save_figure = False)

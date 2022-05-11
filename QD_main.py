@@ -45,9 +45,8 @@ Help:
     python lunar_lander.py --help
 """
 # basic OS interaction
-import time
+import time, os, sys
 from pathlib import Path
-
 
 # python standard modules for AI
 import gym
@@ -62,11 +61,25 @@ from ribs.emitters import ImprovementEmitter, OptimizingEmitter, RandomDirection
 from ribs.optimizers import Optimizer
 
 # my modules
-from saving_utils import *
-from lunar_lander import simulate
+import QD
+from QD.saving_utils import *
+from envs.lunar_lander import simulate 
+
 
 
 env_name = "LunarLanderContinuous-v2"
+
+
+class QD_agent:
+
+    def __init__(self,model,env):
+        action_dim = env.action_space.shape[0]
+        obs_dim = env.observation_space.shape[0]
+        self.model = model.reshape((action_dim, obs_dim))
+
+    def select_action(self, state):
+        return self.model @ state
+
 
 def create_optimizer(seed, n_emitters, sigma0, batch_size):
     """Creates the Optimizer based on given configurations.
@@ -192,41 +205,51 @@ def run_evaluation(outdir, env_seed = 1339, random : bool = False, do_plot : boo
     """
     outdir = Path(outdir)
     df = pd.read_csv(outdir / "archive.csv")
-    print(df)
+
 
     if random: indices = np.random.permutation(len(df))[:10]
     else:      indices = range(len(df))
 
-    if do_plot:
-        save_heatmap(df, str(outdir / "heatmap.png"))
+    # if do_plot:
+    #     save_heatmap(df, str(outdir / "heatmap.png"))
     # Use a single env so that all the videos go to the same directory.
-    print(env_name)
+    print('Environment: '+ env_name)
+
+    # Since we are using multiple processes, it is simpler if each worker
+    # just creates their own copy of the environment instead of trying to
+    # share the environment. This also makes the function "pure."
+    env = gym.make(env_name)
+
     video_env = gym.wrappers.Monitor(
-        gym.make(env_name),
-        str(outdir / "videos"),
-        force=True,
-        # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
-        # https://github.com/openai/gym/blob/master/gym/wrappers/monitor.py#L54).
-        # This will ensure all the videos are written.
-        video_callable=lambda idx: True,
-    )
+                gym.make(env_name),
+                str(outdir / "videos"),
+                force=True,
+                # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
+                # https://github.com/openai/gym/blob/master/gym/wrappers/monitor.py#L54).
+                # This will ensure all the videos are written.
+                video_callable=lambda idx: True,
+                )
+
+    if env_seed is not None:
+        env.seed(env_seed)
+
 
     if do_ranking:
+        print(f'Evaluate archive:')
         MAX_REWARD = 200; max_idx = 0
         for idx in tqdm(indices):
             model = np.array(df.loc[idx, "solution_0":])
-            reward, impact_x_pos, impact_y_vel = simulate(model, env_name, env_seed,
-                                                        video_env=None)
+            actor = QD_agent(model, env)   #wrap the model in an agent class
+            reward, impact_x_pos, impact_y_vel = simulate(actor, env, render = False)
 
             if reward > MAX_REWARD:
                 print(f"Max reward {reward:0.3} at index = {idx}")
-                best_model = model
+                elite_actor= actor
                 MAX_REWARD = reward
                 max_idx = idx
                 
         # simulate again the best, this time with video
-        reward, impact_x_pos, impact_y_vel = simulate(best_model, env_name, env_seed,
-                                                        video_env=video_env) 
+        reward, impact_x_pos, impact_y_vel = simulate(elite_actor, video_env, render = True)
 
         assert int(reward) == int(MAX_REWARD) , f"Different rewards:{reward}, {MAX_REWARD}"                                          
         print(f"=== Index {max_idx} ===\n"
@@ -302,7 +325,7 @@ if __name__ == "__main__":
     outdir_path = './Results_QD/run6_continuous_balanced'
 
     # Train
-    lunar_lander_main(outdir=outdir_path, workers = 5)
+    # lunar_lander_main(outdir=outdir_path, workers = 5)
 
     # Evaluate
-    run_evaluation(outdir=outdir_path, do_ranking= False, do_plot=True)
+    run_evaluation(outdir=outdir_path, do_ranking= True, do_plot=True)
