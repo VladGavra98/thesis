@@ -3,23 +3,37 @@
 ## Small tasks
 > week7: 04/04 - 08/04
 - [x] Learned how DDPG works (read, write, implement)
-- [ ] Learned how TD3 works (read, write, implement)
-- [ ] Learned how SAC works (read, write, implement)
+- [x] Learned how TD3 works (read, write, implement)
+- [x] Learned how SAC works (read, write, implement)
 - [x] Find what is a solution in pyribs
 - [x] Run a couple of basic scenarios on Lunar Lander
-- [ ] Read the QD paper on CMAP-Elites
-- [ ] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
-- [ ] Adapt PD-ERL for lunar lander
-- [ ] Test QD learned polices on damaged lunar lander. It is very interesting to see how well they perform before any online learning.
-- [x] Make a Gantt Chart
 
+> week8: 11/04 - 15/04
+- [x] Make a Gantt Chart
+- [x] Read the QD paper on CMAP-Elites
+- [x] Check 'colas2020scaling' which uses QD for fault-tolerant robot control.
+- [x] Adapt PD-ERL for LunarLander (continuous)
+- [x] Test QD learned polices on damaged lunar lander. It is very interesting to see how well they perform before any online learning.
+- [x] Find out what the batch_size is in QD
+
+> week9: 16/04 - 22/04
+- [x] Make table for overview of ERL, DRL and QD.
+- [x] <s> Find out how to make a NN policy in pyribs</s> - NOT REELVANT 
+ 
+
+> week10: 02/05 - 06/05
+- [x] Improve general fault-tolerant control diagram
+- [x] Finish PD-ERL diagram
+- [x] Finish writing about DL
+- [ ] 
 
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
 ## Report Writing:
 - [x] Novelty search and QD intro
-- [ ] Prepare nice diagram
-- [ ] Background on FT
-- [ ] Background on RL
+- [x] Prepare nice diagram
+- [x] Background on FT
+- [x] Background on RL
+- [x] SOTA DRL
 - 
 
 # Ideas
@@ -29,6 +43,5 @@
 
 
 # Things to check later
-- still not sure how actor-critic frameworks should be implemented
 - Try MPI from OpenAI https://spinningup.openai.com/en/latest/utils/mpi.html
 
