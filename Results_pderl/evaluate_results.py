@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('ggplot') 
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.dpi'] = 140
+plt.rcParams['figure.dpi'] = 300
 # plt.rcParams['figure.figsize'] = [6, 5]
 
 
@@ -10,7 +10,7 @@ colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 color_ddpg = colors[2]
 color_erl = colors[0]
 
-savefig = False
+savefig = True
 
 def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     fig1,ax = plt.subplots()
@@ -55,7 +55,7 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 def plot_fault_tolerancy():
     erl_r = 251.25; erl_std = 26.31
     ddpg_r = 140; ddpg_std = 110.31
-    qd_r = 250; qd_std = 10
+    qd_r = 200; qd_std = 70.4
     # borken engine fault
     erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
@@ -69,8 +69,8 @@ def plot_fault_tolerancy():
     width = 0.35  # the width of the bars
 
     fig, ax = plt.subplots()
-    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal')
-    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine')
+    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal',  capsize=6, ecolor= (0,0,0,0.7))
+    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine',   capsize=6, ecolor = (0,0,0,0.7))
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.bar_label(rects1, labels=[f'{e:.1f}' for e in nominal_std],
@@ -81,11 +81,11 @@ def plot_fault_tolerancy():
     ax.set_ylabel('Rewards [-]')
     # ax.set_title('')
     ax.set_xticks(x, labels)
-    ax.legend()
+    ax.legend(loc = 'lower left')
 
     fig.tight_layout()
     if savefig:
-        fig.savefig('Results_pderl/Plots/reward_games.png')
+        fig.savefig('Results_pderl/Plots/bar_chart.png')
 
 
 #-----------------------------------------------------------------------------
@@ -130,7 +130,7 @@ erl_std   = np.interp(frames_ddpg, frames_erl, erl_std[:,1])
 # Plotting:
 do_plot = True
 if do_plot:
-    # plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
+    plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
     # plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
     plot_fault_tolerancy()
     plt.show()
