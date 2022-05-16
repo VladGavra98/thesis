@@ -1,27 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
-plt.style.use('ggplot') 
+from matplotlib.lines import Line2D
+import matplotlib.patches as mpatches
+
+# available styles:
+#  ['Solarize_Light2', '_classic_test_patch', '_mpl-gallery', '_mpl-gallery-nogrid',
+#  'bmh', 'classic', 'dark_background', 'fast', 'fivethirtyeight', 'ggplot', 'grayscale', 
+# 'seaborn', 'seaborn-bright', 'seaborn-colorblind', 'seaborn-dark', 'seaborn-dark-palette', 
+# 'seaborn-darkgrid', 'seaborn-deep', 'seaborn-muted', 
+# 'seaborn-notebook', 'seaborn-paper', 'seaborn-pastel', 'seaborn-poster', 
+# 'seaborn-talk', 'seaborn-ticks', 'seaborn-white', 'seaborn-whitegrid', 'tableau-colorblind10']
+
+# plot style
+# plt.style.use('ggplot')
+style = 'seaborn-darkgrid'
+plt.style.use(style.lower()) 
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.dpi'] = 140
+plt.rcParams['figure.dpi'] = 240
 # plt.rcParams['figure.figsize'] = [6, 5]
 
-
+# colours
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']  
-color_ddpg = colors[2]
-color_erl = colors[0]
-
+color_ddpg = '#988ED5' if 'seaborn-darkgrid' in style else colors[2]
+color_erl  = colors[0] if 'seaborn-darkgrid' in style else colors[0]
+c_nominal  = colors[0] if 'seaborn-darkgrid' in style else colors[1]
+c_fault1   = '#FBC15E' if 'seaborn-darkgrid' in style else colors[4]
+c_fault2   = colors[3] if 'seaborn-darkgrid' in style else colors[5]
+# Globals:
 savefig = False
 
 def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     fig1,ax = plt.subplots()
     fig1.canvas.manager.set_window_title("Reward versus frames")
     # ax.set_title("Average Reward - LunarLander", pad=20)
-    ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = color_ddpg)
+    ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = color_ddpg, linestyle = '--')
     ax.fill_between(games_ddpg, ddpg_score - ddpg_std, ddpg_score+ ddpg_std, color=color_ddpg,alpha=0.4)
 
     ax.plot(games_ddpg, erl_score, label = 'PD-ERL', color=color_erl)
     ax.fill_between(games_ddpg, erl_score - erl_std, erl_score+ erl_std, color=color_erl, alpha=0.4)
-    ax.set_ylabel("Reward [-]")
+    ax.set_ylabel("Return [-]")
     ax.set_xlabel(r"Games [-]")
     ax.legend(loc = 'lower right')
     fig1.tight_layout()
@@ -37,12 +54,13 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
     fig2,ax = plt.subplots()
     fig2.canvas.manager.set_window_title("Reward versus games")
     # ax.set_title("Average Reward - LunarLander", pad=20)
-    ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=color_ddpg)
+
+    ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=color_ddpg, linestyle = '--')
     ax.fill_between(frames_ddpg//f2e, ddpg_score - ddpg_std, ddpg_score + ddpg_std, color=color_ddpg,alpha=0.4)
 
     ax.plot(frames_ddpg//f2e, erl_score, label = 'PD-ERL', color=color_erl)
     ax.fill_between(frames_ddpg//f2e, erl_score - erl_std, erl_score + erl_std, color=color_erl, alpha=0.4)
-    ax.set_ylabel("Reward [-]")
+    ax.set_ylabel("Return [-]")
     ax.set_xlabel(r"Epochs [$10^4$ frames]")
     ax.legend(loc = 'lower right')
     fig2.tight_layout()
@@ -55,7 +73,7 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
 def plot_fault_tolerancy():
     erl_r = 251.25; erl_std = 26.31
     ddpg_r = 140; ddpg_std = 110.31
-    qd_r = 250; qd_std = 10
+    qd_r = 200; qd_std = 70.4
     # borken engine fault
     erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
@@ -69,23 +87,32 @@ def plot_fault_tolerancy():
     width = 0.35  # the width of the bars
 
     fig, ax = plt.subplots()
-    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal')
-    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine')
+    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal', color = c_nominal, capsize=6, ecolor= (0,0,0,0.7))
+    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine',  color = c_fault1, capsize=6, ecolor = (0,0,0,0.7))
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.bar_label(rects1, labels=[f'{e:.1f}' for e in nominal_std],
-             padding=2, fontsize=14)
+             padding=2, fontsize=11)
     ax.bar_label(rects2, labels=[f'{e:.1f}' for e in faulty_std],
-             padding=2, fontsize=14)
+             padding=2, fontsize=11)
 
-    ax.set_ylabel('Rewards [-]')
-    # ax.set_title('')
+    # delimiter
+    c_background = '#98989B'#(199/255, 199/255, 204/255)
+    plt.axvline(x=1.5, color = c_background, linestyle = '--')
+    ax.set_ylabel('Episode Return [-]')
+
+
+    # Legend
+    handles, _ = plt.gca().get_legend_handles_labels()
+    line = Line2D([0], [0], label='SD', color=(0,0,0,0.7))
+
+    handles.extend([line])
     ax.set_xticks(x, labels)
-    ax.legend()
+    ax.legend(loc = 'lower left',handles=handles)
 
     fig.tight_layout()
     if savefig:
-        fig.savefig('Results_pderl/Plots/reward_games.png')
+        fig.savefig('Results_pderl/Plots/bar_chart.png')
 
 
 #-----------------------------------------------------------------------------
@@ -130,8 +157,8 @@ erl_std   = np.interp(frames_ddpg, frames_erl, erl_std[:,1])
 # Plotting:
 do_plot = True
 if do_plot:
-    # plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
-    # plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
+    plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
+    plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
     plot_fault_tolerancy()
     plt.show()
 
