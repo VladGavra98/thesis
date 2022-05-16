@@ -28,8 +28,7 @@ plt.style.use('ggplot')
 plt.rcParams.update({'font.size': 12})
 
 
-def evaluate(agent, env, trials: int = 10, render: bool = False,
-             broken_engine: bool = False, state_noise : bool= False):
+def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
     """ Evaualte an individual for a couple of trails/games.
 
     Args:
@@ -44,7 +43,7 @@ def evaluate(agent, env, trials: int = 10, render: bool = False,
     rewards, bcs = [], []
 
     for _ in range(trials):
-        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, broken_engine, state_noise)
+        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, **kwargs)
 
         rewards.append(total_reward)
         bcs.append((impact_x_pos, impact_y_vel))
@@ -133,17 +132,18 @@ if __name__ == "__main__":
 
 
     # Evaluation params:
-    num_trials = 5
+    num_trials = 2
     broken_engine= False
     state_noise = True
+    noise_intensity = 0.05
+    extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': noise_intensity}
     # ------------------------------------------------------------------------
     #                                Elite agent
     # -> evalaute the best perforing controller on the nominal system
     # ------------------------------------------------------------------------
     elite_agent = load_rl_agent(parameters, elite_path)
     reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
-                render=args.render, trials=num_trials,\
-                     broken_engine= broken_engine, state_noise = state_noise)
+                render=args.render, trials=num_trials, kwargs = extra_args)
 
     print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
         r_mean, r_std, bcs = evaluate(agent.actor, env,
                 render=args.render, trials=num_trials,\
-                     broken_engine= broken_engine, state_noise = state_noise)
+                     kwargs = extra_args)
         rewards.append(r_mean)
         bcs_map.append(bcs)
         rewards_std.append(r_std)
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     rl_agent = load_rl_agent(parameters, ddpg_path)
     reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
                 render=args.render, trials=num_trials,\
-                    broken_engine= broken_engine, state_noise = state_noise)
+                   kwargs = extra_args)
 
     print(f'RL (ddpg):{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 

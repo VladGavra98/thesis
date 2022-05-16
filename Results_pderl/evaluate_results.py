@@ -16,7 +16,7 @@ import matplotlib.patches as mpatches
 style = 'seaborn-darkgrid'
 plt.style.use(style.lower()) 
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.dpi'] = 240
+plt.rcParams['figure.dpi'] = 200
 # plt.rcParams['figure.figsize'] = [6, 5]
 
 # colours
@@ -25,7 +25,7 @@ color_ddpg = '#988ED5' if 'seaborn-darkgrid' in style else colors[2]
 color_erl  = colors[0] if 'seaborn-darkgrid' in style else colors[0]
 c_nominal  = colors[0] if 'seaborn-darkgrid' in style else colors[1]
 c_fault1   = '#FBC15E' if 'seaborn-darkgrid' in style else colors[4]
-c_fault2   = colors[3] if 'seaborn-darkgrid' in style else colors[5]
+c_fault2   = colors[4] if 'seaborn-darkgrid' in style else colors[5]
 # Globals:
 savefig = False
 
@@ -74,26 +74,40 @@ def plot_fault_tolerancy():
     erl_r = 251.25; erl_std = 26.31
     ddpg_r = 140; ddpg_std = 110.31
     qd_r = 200; qd_std = 70.4
-    # borken engine fault
+
+    # broken engine fault
     erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
     qd_r_faulty = 44.25; qd_std_faulty = 150.30
 
+    # noisy state fault
+    erl_elite_r_noise = 173.41; erl_elite_std_noise = 64.19
+    erl_r_noise = 214.48; erl_std_noise = 69.1
+    ddpg_r_noise = 97.64; ddpg_std_noise = 122.2
+    qd_r_noise = 180.86; qd_std_noise= 108.12
+
     labels = ('PD-ERL', 'DDPG', 'QD')
     nominal_r= [erl_r, ddpg_r,qd_r]; nominal_std = [erl_std,ddpg_std, qd_std]
-    faulty_r = [erl_r_faulty, ddpg_r_faulty,qd_r_faulty]; faulty_std = [erl_std_faulty,ddpg_std_faulty, qd_std_faulty]
+    broken_eng_r = [erl_r_faulty, ddpg_r_faulty,qd_r_faulty]; broken_eng_std= [erl_std_faulty,ddpg_std_faulty, qd_std_faulty]
+    noisy_state_r = [erl_r_noise, ddpg_r_noise,qd_r_noise]; noisy_state_std= [erl_std_noise,ddpg_std_noise, qd_std_noise]
 
     x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    width = 0.25  # the width of the bars
 
     fig, ax = plt.subplots()
-    rects1 = ax.bar(x - width/2, nominal_r, width, yerr = nominal_std, label='Nominal', color = c_nominal, capsize=6, ecolor= (0,0,0,0.7))
-    rects2 = ax.bar(x + width/2, faulty_r, width, yerr= faulty_std, label='Broken Engine',  color = c_fault1, capsize=6, ecolor = (0,0,0,0.7))
+    rects1 = ax.bar(x - width, nominal_r, width, yerr = nominal_std,\
+         label='Nominal', color = c_nominal, capsize=6, ecolor= (0,0,0,0.7))
+    rects3 = ax.bar(x , noisy_state_r, width, yerr= noisy_state_std,\
+         label='Noisy Position',  color = c_fault2, capsize=6, ecolor = (0,0,0,0.7))
+    rects2 = ax.bar(x +width, broken_eng_r, width, yerr= broken_eng_std,\
+         label='Broken Engine',  color = c_fault1, capsize=6, ecolor = (0,0,0,0.7))
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.bar_label(rects1, labels=[f'{e:.1f}' for e in nominal_std],
              padding=2, fontsize=11)
-    ax.bar_label(rects2, labels=[f'{e:.1f}' for e in faulty_std],
+    ax.bar_label(rects2, labels=[f'{e:.1f}' for e in broken_eng_std],
+             padding=2, fontsize=11)
+    ax.bar_label(rects3, labels=[f'{e:.1f}' for e in noisy_state_std],
              padding=2, fontsize=11)
 
     # delimiter
