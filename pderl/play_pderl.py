@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 # my envs
-import envs.lunarlander
+from envs.lunarlander import simulate
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choice',
@@ -28,7 +28,8 @@ plt.style.use('ggplot')
 plt.rcParams.update({'font.size': 12})
 
 
-def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: bool = False):
+def evaluate(agent, env, trials: int = 10, render: bool = False,
+             broken_engine: bool = False, state_noise : bool= False):
     """ Evaualte an individual for a couple of trails/games.
 
     Args:
@@ -37,12 +38,13 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: 
         trials (int, optional): Number of evaluation runs. Defaults to 10.
         render (bool, optional): Show policy in a video. Defaults to False.
 
-
+    Returns:
+        tuple: average reward, reward standard deviation, average behaviour characteristics
     """
     rewards, bcs = [], []
 
     for _ in range(trials):
-        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, broken_engine)
+        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, broken_engine, state_noise)
 
         rewards.append(total_reward)
         bcs.append((impact_x_pos, impact_y_vel))
@@ -50,47 +52,7 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, broken_engine: 
     bcs = np.asarray(bcs)
     return np.average(rewards), np.std(rewards), np.average(bcs, axis=0)
 
-def simulate(actor, env, render, broken_engine):
-    total_reward = 0.0
-    impact_x_pos = None
-    impact_y_vel = None
-    all_y_vels = []
 
-    done = False
-    state = env.reset()
-    done = False
-    while not done:
-        if render:
-            env.render()
-
-        # Actor:
-        action = actor.select_action(np.array(state))
-
-        # Simulate one step in environment
-        if broken_engine:
-            action[0] = np.clip(action[0], -1., 0.5)
-
-        next_state, reward, done, info = env.step(action.flatten())
-
-        total_reward += reward
-        state = next_state
-
-            # Boudnary characteristics:
-        x_pos = state[0]
-        y_vel = state[3]
-        leg0_touch = bool(state[6])
-        leg1_touch = bool(state[7])
-        all_y_vels.append(y_vel)
-
-            # Check if the lunar lander is impacting for the first time.
-        if impact_x_pos is None and (leg0_touch or leg1_touch):
-            impact_x_pos = x_pos
-            impact_y_vel = y_vel
-
-    if impact_x_pos is None:
-        impact_x_pos = x_pos
-        impact_y_vel = min(all_y_vels)
-    return total_reward,impact_x_pos,impact_y_vel
 
 
 def load_genetic_agent(args, model_path: str, elite_path: str = None):
@@ -169,16 +131,21 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    num_trials = 2
+
+    # Evaluation params:
+    num_trials = 5
+    broken_engine= False
+    state_noise = True
     # ------------------------------------------------------------------------
     #                                Elite agent
     # -> evalaute the best perforing controller on the nominal system
     # ------------------------------------------------------------------------
     elite_agent = load_rl_agent(parameters, elite_path)
     reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
-                render=args.render, trials=num_trials, broken_engine=False)
+                render=args.render, trials=num_trials,\
+                     broken_engine= broken_engine, state_noise = state_noise)
 
-    print(f'Elite:{reward_mean:.2f}, {reward_std:.2f}\n')
+    print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 
     # --------------------------------------------------------------------------
     #                            ERL Population
@@ -188,7 +155,8 @@ if __name__ == "__main__":
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
         r_mean, r_std, bcs = evaluate(agent.actor, env,
-                render=args.render, trials=num_trials, broken_engine=True)
+                render=args.render, trials=num_trials,\
+                     broken_engine= broken_engine, state_noise = state_noise)
         rewards.append(r_mean)
         bcs_map.append(bcs)
         rewards_std.append(r_std)
@@ -197,7 +165,8 @@ if __name__ == "__main__":
     bcs_map = np.asarray(bcs_map)
     rewards_std = np.asarray(rewards_std)
     new_elite = np.argmax(rewards)
-    print(f'New elite: {rewards[new_elite]:.2f},{rewards_std[new_elite]:.2f}\n')
+
+    print(f'New elite: {rewards[new_elite]:.2f}, with SD = {rewards_std[new_elite]:.2f}\n')
 
 
     # ------------------------------------------------------------------------
@@ -205,9 +174,10 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------
     rl_agent = load_rl_agent(parameters, ddpg_path)
     reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
-                render=args.render, trials=num_trials, broken_engine=True)
+                render=args.render, trials=num_trials,\
+                    broken_engine= broken_engine, state_noise = state_noise)
 
-    print(f'RL (ddpg):{reward_mean:.2f}, {reward_std:.2f}\n')
+    print(f'RL (ddpg):{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 
     # -----------------------------------------------------------------------
     #                                   Plotting

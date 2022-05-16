@@ -62,8 +62,7 @@ from ribs.optimizers import Optimizer
 
 # my modules
 from QD.saving_utils import *
-from envs.lunarlander import simulate 
-
+from envs.lunarlander import simulate
 
 
 env_name = "LunarLanderContinuous-v2"
@@ -71,7 +70,7 @@ env_name = "LunarLanderContinuous-v2"
 
 class QD_agent:
 
-    def __init__(self,model,env):
+    def __init__(self, model, env):
         action_dim = env.action_space.shape[0]
         obs_dim = env.observation_space.shape[0]
         self.model = model.reshape((action_dim, obs_dim))
@@ -162,7 +161,8 @@ def run_search(client, optimizer, env_seed, iterations, log_freq):
 
         # Ask the Dask client to distribute the simulations among the Dask
         # workers, then gather the results of the simulations.
-        futures = client.map(lambda model: simulate(model, env_name, env_seed), sols)
+        futures = client.map(lambda model: simulate(
+            model, env_name, env_seed), sols)
         results = client.gather(futures)
 
         # Process the results.
@@ -190,9 +190,9 @@ def run_search(client, optimizer, env_seed, iterations, log_freq):
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#                              Test Traiend Policies 
+#                              Test Traiend Policies
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def run_evaluation(outdir, env_seed = 1339, random : bool = False, broken_engine : bool= False, trials : bool= 5):
+def run_evaluation(outdir, env_seed=1339, random: bool = False, broken_engine: bool = False, trials: bool = 5):
     """Simulates 10 random archive solutions and saves videos of them.
 
     Videos are saved to outdir / videos.
@@ -205,18 +205,18 @@ def run_evaluation(outdir, env_seed = 1339, random : bool = False, broken_engine
     outdir = Path(outdir)
     df = pd.read_csv(outdir / "archive.csv")
 
-
-    if random: indices = np.random.permutation(len(df))[:10]
-    else:      indices = range(len(df))
+    if random:
+        indices = np.random.permutation(len(df))[:10]
+    else:
+        indices = range(len(df))
 
     # if do_plot:
     #     save_heatmap(df, str(outdir / "heatmap.png"))
     # Use a single env so that all the videos go to the same directory.
     if broken_engine:
-        print('Environment: '+ env_name + ' broken engine')
+        print('Environment: ' + env_name + ' broken engine')
     else:
-      print('Environment: '+ env_name)
-
+        print('Environment: ' + env_name)
 
     # Since we are using multiple processes, it is simpler if each worker
     # just creates their own copy of the environment instead of trying to
@@ -224,43 +224,45 @@ def run_evaluation(outdir, env_seed = 1339, random : bool = False, broken_engine
     env = gym.make(env_name)
 
     video_env = gym.wrappers.Monitor(
-                gym.make(env_name),
-                str(outdir / "videos"),
-                force=True,
-                # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
-                # https://github.com/openai/gym/blob/master/gym/wrappers/monitor.py#L54).
-                # This will ensure all the videos are written.
-                video_callable=lambda idx: True,
-                )
+        gym.make(env_name),
+        str(outdir / "videos"),
+        force=True,
+        # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
+        # https://github.com/openai/gym/blob/master/gym/wrappers/monitor.py#L54).
+        # This will ensure all the videos are written.
+        video_callable=lambda idx: True,
+    )
 
     if env_seed is not None:
         env.seed(env_seed)
 
-
     print(f'Evaluate archive:')
-    MAX_REWARD = 200; max_idx = 0
+    MAX_REWARD = 200
+    max_idx = 0
     for idx in tqdm(indices):
         model = np.array(df.loc[idx, "solution_0":])
-        actor = QD_agent(model, env)   #wrap the model in an agent class
-        reward, impact_x_pos, impact_y_vel = simulate(actor, env, broken_engine = broken_engine, render = False)
+        actor = QD_agent(model, env)   # wrap the model in an agent class
+        reward, impact_x_pos, impact_y_vel = simulate(
+            actor, env, broken_engine=broken_engine, render=False)
 
         if reward > MAX_REWARD:
             print(f"Max reward {reward:0.3} at index = {idx}")
-            elite_actor= actor
+            elite_actor = actor
             MAX_REWARD = reward
             max_idx = idx
-            
+
     # simulate again the best, this time with video
     print(f'\nEvaluating elite (agent {max_idx})...')
-    rewards, bcs = [], [] 
+    rewards, bcs = [], []
     for _ in tqdm(range(trials)):
-      reward, impact_x_pos, impact_y_vel = simulate(elite_actor, env,broken_engine= broken_engine, render = False)
-      rewards.append(reward)
-      bcs.append((impact_x_pos, impact_y_vel))
+        reward, impact_x_pos, impact_y_vel = simulate(
+            elite_actor, env, broken_engine=broken_engine, render=False)
+        rewards.append(reward)
+        bcs.append((impact_x_pos, impact_y_vel))
 
     bcs = np.asarray(bcs)
 
-    simulate(elite_actor, video_env,broken_engine= broken_engine, render = True)                              
+    simulate(elite_actor, video_env, broken_engine=broken_engine, render=True)
     # close video env
     video_env.close()
 
@@ -299,12 +301,12 @@ def lunar_lander_main(workers=4,
     outdir = Path(outdir)
     outdir.mkdir(exist_ok=True)
 
-
     # Setup Dask. The client connects to a "cluster" running on this machine.
     # The cluster simply manages several concurrent worker processes. If using
     # Dask across many workers, we would set up a more complicated cluster and
     # connect the client to it.
-    print(f"Total nubmer of simualtions: {iterations * batch_size * n_emitters}")
+    print(
+        f"Total nubmer of simualtions: {iterations * batch_size * n_emitters}")
     cluster = LocalCluster(
         processes=True,  # Each worker is a process.
         n_workers=workers,  # Create this many worker processes.
@@ -333,8 +335,9 @@ if __name__ == "__main__":
     # lunar_lander_main(outdir=outdir_path, workers = 5)
 
     # Evaluate
-    reward_mean, reward_std, bcs  = run_evaluation(outdir=outdir_path, trials =100, broken_engine = False)
-    print(f"Reward: {reward_mean:.2f}\n", 
-    f"Reward STD: {reward_std:.2f}\n", 
-                f"Impact x-pos: {bcs[0]:.2f}\n",
-                f"Impact y-vel: {bcs[1]:.2f}\n")
+    reward_mean, reward_std, bcs = run_evaluation(
+        outdir=outdir_path, trials=100, broken_engine=False)
+    print(f"Reward: {reward_mean:.2f}\n",
+          f"Reward STD: {reward_std:.2f}\n",
+          f"Impact x-pos: {bcs[0]:.2f}\n",
+          f"Impact y-vel: {bcs[1]:.2f}\n")

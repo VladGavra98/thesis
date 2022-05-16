@@ -1,18 +1,21 @@
 import numpy as np
 import typing
 
-def simulate(actor : object, env : object,render : bool = False, broken_engine : bool = False) -> tuple:
+def simulate (actor : object, env : object,render : bool = False, 
+             broken_engine : bool = False, 
+             state_noise : bool = False, 
+             noise_intensity : float = 0.05) -> tuple:
     """ Wrapper function for the gym Luanr LAnder enviornment. It can include the faulty cases:
-            -> broken engine
-
+            -> broken main engine
+            -> faulty navigation snesors (i.e., nosiy position)
 
     Args:
         actor (object): Actor class that has the select_action() method
         env (object): Environment with OpenAI Gym API (make(), reset(),step())
         render (bool, optional): Should render the video env. Defaults to False.
         broken_engine (bool, optional): Clip the main engine to 75% (fault cases for evaluation only). Defaults to False.
-                                         
-                                         
+        state_noise (bool, optional): Add zero-mean Gaussian noise to the (x,y) observations (fault cases for evaluation only). Defaults to False.                               
+         noise_intensity (float,opptional): Intensity (SD) of the Gaussian noise added to the state. Defaults to 0.05.                                
     Returns:
         tuple: Reward (float), Imapct x-position (float), impact y-velocity (float)
     """
@@ -36,12 +39,20 @@ def simulate(actor : object, env : object,render : bool = False, broken_engine :
         # Simulate one step in environment
         if broken_engine:
             action[0] = np.clip(action[0], -1., 0.5)
-
+        # Step
         next_state, reward, done, info = env.step(action.flatten())
 
+        # Update
         total_reward += reward
         state = next_state
 
+        ## add position noise -- fualty sensor readings 
+        if state_noise:
+            noise = np.random.normal(0,noise_intensity,2)
+            # print(state[:2],noise)
+            state[:2] = state[:2] + noise
+
+        
         # Boudnary characteristics (BCs):
         x_pos = state[0]
         y_vel = state[3]
