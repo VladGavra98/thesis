@@ -29,23 +29,37 @@ class GeneticAgent:
         self.buffer = replay_memory.ReplayMemory(self.args.individual_bs, args.device)
         self.loss = nn.MSELoss()
 
-    def update_parameters(self, batch, p1, p2, critic):
+    def update_parameters(self, batch, p1, p2, critic) -> float:
+        """ Crossover parameter update.
+
+        Args:
+            batch (tuple): Past experiences
+            p1 (_type_): Parent actor 1
+            p2 (_type_): Parent actor 1
+            critic (_type_): Critic network  for filtering
+
+        Returns:
+            float: Policy clonning loss
+        """
         state_batch, _, _, _, _ = batch
 
+        #  Redeem parents' actions
         p1_action = p1(state_batch)
         p2_action = p2(state_batch)
         p1_q = critic(state_batch, p1_action).flatten()
         p2_q = critic(state_batch, p2_action).flatten()
 
-        eps = 0.0
+       
+        #  Select best behaving pparent based on Q-filtering:
+        eps = 0.0  # selection threshold -- how much better one action is wrt the other
         action_batch = torch.cat((p1_action[p1_q - p2_q > eps], p2_action[p2_q - p1_q >= eps])).detach()
         state_batch = torch.cat((state_batch[p1_q - p2_q > eps], state_batch[p2_q - p1_q >= eps]))
         actor_action = self.actor(state_batch)
 
-        # Actor Update
+        #  Actor update
         self.actor_optim.zero_grad()
-        sq = (actor_action - action_batch)**2
-        policy_loss = torch.sum(sq) + torch.mean(actor_action**2)
+        sq = (actor_action - action_batch)**2  
+        policy_loss = torch.sum(sq) + torch.mean(actor_action**2)   # clonning loss
         policy_mse = torch.mean(sq)
         policy_loss.backward()
         self.actor_optim.step()

@@ -8,7 +8,7 @@ from parameters import Parameters
 num_games = 5000
 num_frames = num_games * 200
 
-
+# -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
 # parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
@@ -19,10 +19,10 @@ parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-novelty', help='Use novelty exploration', action='store_true')
-parser.add_argument('-proximal_mut', help='Use safe mutation', action='store_true')
-parser.add_argument('-distil', help='Use distilation crossover', action='store_true')
+parser.add_argument('-proximal_mut', help='Use safe mutation', action='store_true', default=True)
+parser.add_argument('-distil', help='Use distilation crossover', action='store_true', default = True)
 parser.add_argument('-distil_type', help='Use distilation crossover. Choices: (fitness) (distance)',
-                    type=str, default='fitness')
+                    type=str, default='distance')
 parser.add_argument('-per', help='Use Prioritised Experience Replay', action='store_true')
 parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float, default=0.05)
 parser.add_argument('-mut_noise', help='Use a random mutation magnitude', action='store_true')

@@ -14,7 +14,7 @@ import os
 class SSNE:
     def __init__(self, args: Parameters, critic, evaluate):
         self.current_gen = 0
-        self.args = args;
+        self.args = args
         self.critic = critic
         self.population_size = self.args.pop_size
         self.num_elitists = int(self.args.elite_fraction * args.pop_size)
