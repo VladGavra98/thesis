@@ -82,7 +82,7 @@ def load_rl_agent(args, model_path: str = 'ddpg/logs/evo_net.pkl'):
     return agent
 
 
-def gen_heatmap(bcs_map: np.ndarray, rewards: np.ndarray, filename: str, save_figure: bool = False):
+def gen_heatmap(bcs_map: np.ndarray, rewards: np.ndarray, filename: str, save_figure: bool = False, name : str = None):
     """Saves a heatmap of the optimizer's archive to the filename.
 
     Args:
@@ -92,25 +92,68 @@ def gen_heatmap(bcs_map: np.ndarray, rewards: np.ndarray, filename: str, save_fi
     fig, ax = plt.subplots(figsize=(8, 6))
     img = ax.scatter(bcs_map[:, 0], bcs_map[:, 1],
                      c=rewards, marker='s', cmap='magma')
-    # fig.suptitle('Archive Illumiantion')
+
+    if name is not None:
+        fig.suptitle('Archive: ' + str(name))
+
     ax.invert_yaxis()  # Makes more sense if larger velocities are on top.
     ax.set_ylabel(r"Impact $\dot{y}$")
     ax.set_xlabel(r"Impact $x$")
 
     cbar = fig.colorbar(img, orientation='vertical')
-    cbar.ax.set_title('Mean Reward')
-
-    plt.show()
+    cbar.ax.set_title('Mean Return')
+    plt.tight_layout()
 
     if save_figure:
         fig.savefig(filename)
         print('Figured saved.')
 
 
+def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple:
+    """Translate case into simulation paramaters:
+
+    Args:
+        case (str): Identifier to case to evaluate.
+
+    Returns:
+        tuple: argumetns to be passed to environment, name for plottign function
+    """    
+    case = str(case)
+    filename = 'Results_pderl/Plots/population_map.png'
+    
+    if 'nominal' in case.lower():
+        print('Current case: nominal')
+        extra_args = {'broken_engine' : False, 'state_noise' : False, 'noise_intensity': 0.05}
+        plotname = 'nominal'
+        filename = plotfolder + '/map.png'
+
+    elif 'noisy' in case.lower():
+        print('Current case: faulty system - noisy state')
+        extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': 0.05}
+        plotname = 'noisy state (F1)'
+        filename = plotfolder + '/map_noisystate.png'
+
+    elif 'broken' in case.lower():
+        print('Current case: faulty system - broken engine')
+        extra_args = {'broken_engine' : True, 'state_noise' : False, 'noise_intensity': 0.05}
+        plotname = 'broken engine (F2)'
+        filename = plotfolder + '/map_brokenengine.png'
+
+    else:
+        Warning('No case provided for evaluation!')
+
+    return extra_args, plotname, filename
+
+
 if __name__ == "__main__":
-    env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
+
+    # Evaluation params:
+    num_trials = 10
+    case = 'broken'
+    save_figure = True
 
     # Global paths:
+    env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
     model_path = 'pderl/logs_s1_e3_buffer5e04/evo_nets.pkl'
     elite_path = 'pderl/logs_s1_e3_buffer5e04/elite_net.pkl'
     ddpg_path = 'pderl/logs_ddpg/ddpg_net.pkl'
@@ -131,12 +174,8 @@ if __name__ == "__main__":
     random.seed(args.seed)
 
 
-    # Evaluation params:
-    num_trials = 2
-    broken_engine= False
-    state_noise = True
-    noise_intensity = 0.05
-    extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': noise_intensity}
+    extra_args, plotname,filename = _extract_case(case)    
+
     # ------------------------------------------------------------------------
     #                                Elite agent
     # -> evalaute the best perforing controller on the nominal system
@@ -182,8 +221,12 @@ if __name__ == "__main__":
     # -----------------------------------------------------------------------
     #                                   Plotting
     # ------------------------------------------------------------------------
-    # gen_heatmap(bcs_map, rewards, 
-    #           filename='Results_pderl/Plots/population_map.png')
+    gen_heatmap(bcs_map, rewards, filename=filename, name = plotname, save_figure=save_figure)
     # gen_heatmap(bcs_map, rewards,
-    #             filename='Results_pderl/Plots/population_map_broeknengine.png',\
+    #             filename='Results_pderl/Plots/population_map_brokenengine.png',\
     #             save_figure = False)
+    # gen_heatmap(bcs_map, rewards,
+    #             filename='Results_pderl/Plots/population_map_noisystate.png', \
+    #             name = 'noisy state (F1)',save_figure = True)
+
+    plt.show()
