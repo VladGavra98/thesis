@@ -7,13 +7,13 @@ class Parameters:
     def __init__(self, cla, init=True):
         if not init:
             return
-        cla = cla.parse_args()
 
         # Set the device to run on CUDA or CPU
         if not cla.disable_cuda and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
+        print('Current device:', self.device)
 
         # Render episodes
         self.render = cla.render
@@ -130,6 +130,7 @@ class Parameters:
         params = pprint.pformat(vars(self), indent=4)
         if stdout:
             print(params)
+        return params
 
         with open(os.path.join(self.save_foldername, 'info.txt'), 'w') as f:
             f.write(params)

@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.patches as mpatches
+import wandb
+import pandas as pd
+from pathlib import Path
 
 # available styles:
 #  ['Solarize_Light2', '_classic_test_patch', '_mpl-gallery', '_mpl-gallery-nogrid',
@@ -12,12 +15,11 @@ import matplotlib.patches as mpatches
 # 'seaborn-talk', 'seaborn-ticks', 'seaborn-white', 'seaborn-whitegrid', 'tableau-colorblind10']
 
 # plot style
-# plt.style.use('ggplot')
 style = 'seaborn-darkgrid'
 plt.style.use(style.lower()) 
 plt.rcParams.update({'font.size': 12})
 plt.rcParams['figure.dpi'] = 200
-# plt.rcParams['figure.figsize'] = [6, 5]
+# plt.rcParams['figure.figsize'] = [6, 5]   #disabled for better figures
 
 # colours
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']  
@@ -130,49 +132,61 @@ def plot_fault_tolerancy():
 
 
 #-----------------------------------------------------------------------------
+def load_from_csv(log_file : str, agent_name):
 
-# Load data
-logs = 'pderl/logs_s1_e3_buffer5e04'
-logs_ddpg = 'pderl/logs_ddpg'
+    # Load data
+    logs_dir = Path(log_file)
+    logs = logs_dir / Path(agent_name) 
 
-# ddpg
-ddpg_score = np.genfromtxt(logs_ddpg+ '/ddpg_reward_frames.csv', skip_header= 1, delimiter=',')
-ddpg_std = np.genfromtxt(logs_ddpg + '/ddpg_std_games.csv', skip_header= 1, delimiter=',')
+    score_arr = np.genfromtxt(logs.as_posix() + '_frames.csv' , skip_header= 1, delimiter=',')
+    std_arr = np.genfromtxt(logs.as_posix() + '_std_games.csv', skip_header= 1, delimiter=',')
 
-# erl
-erl_score = np.genfromtxt(logs + '/erl_frames.csv', skip_header= 1, delimiter=',')
-erl_std   = np.genfromtxt(logs + '/erl_std_games.csv', skip_header= 1, delimiter=',')
+    # Retrieve x-axis arrays:
+    frames = score_arr[:,0]
+    games = std_arr[:,0]
+    score = score_arr[:,1];std = std_arr[:,1]
 
+    return score,std,frames,games
 
-# Retrieve x-axis arrays:
-frames_ddpg = ddpg_score[:,0]; frames_erl = erl_score[:,0]
-games_erl = erl_std[:,0]; games_ddpg = ddpg_std[:,0]
-ddpg_score = ddpg_score[:,1]; ddpg_std= ddpg_std[:,1]; 
-print(f'Recorded frames: erl-{len(frames_erl)}, ddpg-{len(frames_ddpg)}')
-
-# # Slicing:
-extra = 0.05
-assert len(games_ddpg) == len(frames_ddpg)
-if frames_ddpg[-1] > frames_erl[-1]:
-    max_f = np.argwhere(frames_ddpg > (1+extra) * frames_erl[-1])[0][0]
-    frames_ddpg = frames_ddpg[:max_f]; games_ddpg = games_ddpg[:max_f]
-    ddpg_score = ddpg_score[:max_f]; ddpg_std = ddpg_std[:max_f]
-else:
-    max_f = np.argwhere(frames_erl > (1+extra) * frames_ddpg[-1])[0][0]
-    frames_erl = frames_erl[:max_f]; games_erl = games_erl[:max_f]
-    erl_score = erl_score[:max_f]; erl_std = erl_std[:max_f]
+if __name__ == '__main__':
 
 
-# Resample:
-erl_score = np.interp(frames_ddpg, frames_erl, erl_score[:,1])
-erl_std   = np.interp(frames_ddpg, frames_erl, erl_std[:,1])
+    api = wandb.Api()
+    run = api.run("vgavra/pderl_lunarlander/1mk42cnb")
+    df = pd.DataFrame(run.history())
+    print(df.head())
+    erl_score = df['test_score'];erl_std = df['test_sd']
+    frames_erl= df['frames']
+    games_erl = df['games']
+
+    ddpg_score, ddpg_std, frames_ddpg,  games_ddpg = load_from_csv('pderl/logs_ddpg', agent_name = 'ddpg') 
+    erl_score, erl_std, frames_erl,  games_erl = load_from_csv('pderl/logs_s1_e3_b5e04_PD', agent_name = 'erl') 
+
+    print(f'Recorded frames: erl-{len(frames_erl)}, ddpg-{len(frames_ddpg)}')
+
+    # # Slicing:
+    extra = 0.05
+    assert len(games_ddpg) == len(frames_ddpg)
+    if frames_ddpg[-1] > frames_erl[-1]:
+        max_f = np.argwhere(frames_ddpg > (1+extra) * frames_erl[-1])[0][0]
+        frames_ddpg = frames_ddpg[:max_f]; games_ddpg = games_ddpg[:max_f]
+        ddpg_score = ddpg_score[:max_f]; ddpg_std = ddpg_std[:max_f]
+    else:
+        max_f = np.argwhere(frames_erl > (1+extra) * frames_ddpg[-1])[0][0]
+        frames_erl = frames_erl[:max_f]; games_erl = games_erl[:max_f]
+        erl_score = erl_score[:max_f]; erl_std = erl_std[:max_f]
 
 
-# Plotting:
-do_plot = True
-if do_plot:
-    plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
-    plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
-    plot_fault_tolerancy()
-    plt.show()
+    # Resample:
+    erl_score = np.interp(frames_ddpg, frames_erl, erl_score)
+    erl_std   = np.interp(frames_ddpg, frames_erl, erl_std)
+
+
+    # Plotting:
+    do_plot = True
+    if do_plot:
+        plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
+        plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
+        # plot_fault_tolerancy()
+        plt.show()
 

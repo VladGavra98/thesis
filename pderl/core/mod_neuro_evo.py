@@ -301,7 +301,7 @@ class SSNE:
                 'mut_child_fit': test_score_c,
             })
 
-            if self.args.verbose_crossover:
+            if self.args.verbose_mutation:
                 print("==================== Mutation ======================")
                 print("Fitness before: ", test_score_p)
                 print("Fitness after: ", test_score_c)
@@ -378,9 +378,9 @@ class SSNE:
 
         # Crossover between elite and offsprings for the unselected genes with 100 percent probability
         if self.args.distil:
-            if self.args.distil_type == 'fitness':
+            if 'fitness' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
-            elif self.args.distil_type == 'dist':
+            elif 'dist' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
             else:
                 raise NotImplementedError('Unknown distilation type')
@@ -400,12 +400,13 @@ class SSNE:
                 self.crossover_inplace(pop[i], pop[j])
 
         # Crossover for selected offsprings
-        for i in offsprings:
-            if random.random() < self.args.crossover_prob:
-                others = offsprings.copy()
-                others.remove(i)
-                off_j = random.choice(others)
-                self.clone(self.distilation_crossover(pop[i], pop[off_j]), pop[i])
+        if self.args.crossover_prob > 0.01:
+            for i in offsprings:
+                if random.random() < self.args.crossover_prob:
+                    others = offsprings.copy()
+                    others.remove(i)
+                    off_j = random.choice(others)
+                    self.clone(self.distilation_crossover(pop[i], pop[off_j]), pop[i])
 
         # Mutate all genes in the population except the new elitists
         for i in range(self.population_size):

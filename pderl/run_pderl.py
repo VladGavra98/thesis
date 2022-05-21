@@ -3,6 +3,7 @@ from core import mod_utils as utils, agent
 import gym, torch
 import argparse
 from parameters import Parameters
+import wandb
 
 '''                           Globals                                                        '''
 num_games = 5000
@@ -10,9 +11,10 @@ num_frames = num_games * 200
 
 # -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
+parser.add_argument('-run_name', default = 'test', type = str)
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
 # parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
-parser.add_argument('-frames', help = 'Number of frames to learn from', default = num_frames)
+parser.add_argument('-frames', help = 'Number of frames to learn from', default = num_frames, type = int)
 #  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
@@ -57,14 +59,11 @@ def save_agents(parameters : object, elite_index : int = None):
     print("Progress Saved")
 
 if __name__ == "__main__":
-    parameters = Parameters(parser)  # Inject the cla arguments in the parameters object
-    
-    tracker = utils.Tracker(parameters, ['erl', 'erl_std'], '_games.csv')  # Initiate tracker
-    frame_tracker = utils.Tracker(parameters, ['erl'], '_frames.csv')  # Initiate tracker
-    time_tracker = utils.Tracker(parameters, ['erl'], '_time.csv')
-    ddpg_tracker = utils.Tracker(parameters, ['ddpg_reward', 'ddpg_std'], '_games.csv')
-    ddpg_frames = utils.Tracker(parameters, ['ddpg_reward'], '_frames.csv')
-    selection_tracker = utils.Tracker(parameters, ['elite', 'selected', 'discarded'], '_selection.csv')
+    cla = parser.parse_args()
+
+    # strat trackers
+    wandb.init(project="pderl_lunarlander", entity="vgavra", name = cla.run_name)
+    parameters = Parameters(cla)  # Inject the cla arguments in the parameters object
 
     # Create Env
     env = utils.NormalizedActions(gym.make(parameters.env_name))
@@ -73,7 +72,8 @@ if __name__ == "__main__":
     parameters.state_dim = env.observation_space.shape[0]
 
     # Write the parameters to a the info file and print them
-    parameters.write_params(stdout=True)
+    params_dict = parameters.write_params(stdout=True)
+    wandb.config = params_dict
 
     # Seed
     env.seed(parameters.seed)
@@ -110,8 +110,7 @@ if __name__ == "__main__":
               ' Test_Max:','%.2f'%erl_score if erl_score is not None else None,
               ' Test_SD:','%.2f'%erl_std if erl_std is not None else None,
               ' Population_Avg:', '%.2f'%pop_avg if pop_avg is not None else None,
-              '\n'
-              ' Avg:','%.2f'%tracker.all_tracker[0][1],
+              '\n',
               ' DDPG Reward:', '%.2f'%ddpg_reward,
               ' PG Loss:', '%.4f' % policy_gradient_loss, '\n')
 
@@ -120,12 +119,9 @@ if __name__ == "__main__":
         discarded = agent.evolver.selection_stats['discarded'] / agent.evolver.selection_stats['total']
 
         # Update loggers:
-        tracker.update([erl_score, erl_std], agent.num_games)
-        frame_tracker.update([erl_score, erl_std], agent.num_frames)
-        ddpg_tracker.update([ddpg_reward, ddpg_std], agent.num_games)
-        ddpg_frames.update([ddpg_reward, ddpg_std], agent.num_frames)
-        time_tracker.update([erl_score, erl_std], time.time()-time_start)
-        selection_tracker.update([elite, selected, discarded], agent.num_frames)
+        stats['frames'] = agent.num_frames; stats['games']= agent.num_games
+        wandb.log(stats)
+
 
         # Save Policy
         if agent.num_games > next_save:

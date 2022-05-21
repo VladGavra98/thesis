@@ -109,7 +109,7 @@ class Agent:
         for _ in range(epochs):
             transitions = self.replay_buffer.sample(self.args.batch_size)
             batch = replay_memory.Transition(*zip(*transitions))
-
+            # each agent novelty
             for i, net in enumerate(self.pop):
                 novelties[i] += (net.get_novelty(batch))
         return novelties / epochs
@@ -193,8 +193,9 @@ class Agent:
             self.evolver.rl_policy = replace_index
             print('Sync from RL --> Evolution')
 
-        # Get popualtion nvelty:
-        pop_novelty = self.get_pop_novelty()
+        # # Get popualtion nvelty:
+        # TODO: chek this later
+        # pop_novelty = self.get_pop_novelty()
         # -------------------------- Collect statistics --------------------------
         return {
             'best_train_fitness': best_train_fitness,
@@ -206,7 +207,7 @@ class Agent:
             'ddpg_std':    ddpg_std,
             'pg_loss':     np.mean(losses['pgs_loss']),
             'bc_loss':     np.mean(losses['bcs_loss']),
-            'pop_novelty': np.mean(pop_novelty),
+            'pop_novelty': 0.,
         }
 
 

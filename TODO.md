@@ -40,7 +40,7 @@
 - [x] Test on LunarLander with faulty state measurement
 - [x] Finish writing about PDERL: 
   - [x] figure
-  - [ ] tricks
+  - [x] tricks
   - [ ] results
 - [ ] Write DRL in flight Control
 

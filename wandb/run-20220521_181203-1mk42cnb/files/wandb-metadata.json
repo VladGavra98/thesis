@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.13.0-41-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "heartbeatAt": "2022-05-21T16:12:05.562678",
+    "startedAt": "2022-05-21T16:12:03.388893",
+    "docker": null,
+    "gpu": "Quadro M1200",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/vlad/Documents/thesis/pderl/run_pderl.py",
+    "codePath": "pderl/run_pderl.py",
+    "git": {
+        "remote": "https://github.com/VladGavra98/thesis.git",
+        "commit": "8d2db84b2c12cfd780865facd17056fb48ed237e"
+    },
+    "email": "vladgavra98@gmail.com",
+    "root": "/home/vlad/Documents/thesis",
+    "host": "vlad-HP",
+    "username": "vlad",
+    "executable": "/bin/python3"
+}
