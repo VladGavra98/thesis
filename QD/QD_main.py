@@ -210,11 +210,6 @@ def run_evaluation(outdir, env_seed=1339, random: bool = False, trials: bool = 5
     else:
         indices = range(len(df))
 
-    # if do_plot:
-    #     save_heatmap(df, str(outdir / "heatmap.png"))
-    # Use a single env so that all the videos go to the same directory.
-
-
     # Since we are using multiple processes, it is simpler if each worker
     # just creates their own copy of the environment instead of trying to
     # share the environment. This also makes the function "pure."
@@ -240,10 +235,10 @@ def run_evaluation(outdir, env_seed=1339, random: bool = False, trials: bool = 5
         model = np.array(df.loc[idx, "solution_0":])
         actor = QD_agent(model, env)   # wrap the model in an agent class
         reward, impact_x_pos, impact_y_vel = simulate(
-            actor, env, render=False,**kwargs)
+                                            actor, env, render=False,**kwargs)
 
         if reward > MAX_REWARD:
-            print(f"Max reward {reward:0.3} at index = {idx}")
+            print(f"Max reward {reward:0.3f} at index = {idx}")
             elite_actor = actor
             MAX_REWARD = reward
             max_idx = idx
@@ -252,9 +247,9 @@ def run_evaluation(outdir, env_seed=1339, random: bool = False, trials: bool = 5
     print(f'\nEvaluating identified elite (actor {max_idx})...')
     rewards, bcs = [], []
     for _ in tqdm(range(trials)):
-        reward, impact_x_pos, impact_y_vel = simulate(
-            elite_actor, env, render=False, **kwargs)
-        rewards.append(reward)
+        total_reward, impact_x_pos, impact_y_vel = simulate(
+                                        elite_actor, env, render=False, **kwargs)
+        rewards.append(total_reward)
         bcs.append((impact_x_pos, impact_y_vel))
 
     bcs = np.asarray(bcs)
@@ -334,11 +329,11 @@ if __name__ == "__main__":
     # Evaluate
     noise_intensity = 0.05
     extra_args = {'broken_engine' : False, 
-                'state_noise' : True, 
+                'state_noise' : False, 
                 'noise_intensity': 0.05}
 
     reward_mean, reward_std, bcs = run_evaluation(
-        outdir=outdir_path, trials=100, kwargs = extra_args)
+                                outdir=outdir_path, trials=10, kwargs = extra_args)
     print(f"Reward: {reward_mean:.2f}\n",
           f"Reward STD: {reward_std:.2f}\n",
           f"Impact x-pos: {bcs[0]:.2f}\n",

@@ -38,6 +38,7 @@ def simulate (actor : object, env : object,render : bool = False,
 
         # Simulate one step in environment
         if broken_engine:
+            # print('Faulty case -- Broken engine')
             action[0] = np.clip(action[0], -1., 0.5)
         # Step
         next_state, reward, done, info = env.step(action.flatten())
@@ -48,8 +49,8 @@ def simulate (actor : object, env : object,render : bool = False,
 
         ## add position noise -- fualty sensor readings 
         if state_noise:
+            # print('Faulty case -- Noisy action')
             noise = np.random.normal(0,noise_intensity,2)
-            # print(state[:2],noise)
             state[:2] = state[:2] + noise
 
         

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import matplotlib.patches as mpatches
+from scipy.interpolate import interp1d
 import wandb
 import pandas as pd
 from pathlib import Path
@@ -23,22 +23,25 @@ plt.rcParams['figure.dpi'] = 200
 
 # colours
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']  
-color_ddpg = '#988ED5' if 'seaborn-darkgrid' in style else colors[2]
-color_erl  = colors[0] if 'seaborn-darkgrid' in style else colors[0]
+color_ddpg = colors[0] if 'seaborn-darkgrid' in style else colors[2]
+color_erl  = colors[3] if 'seaborn-darkgrid' in style else colors[0]
 c_nominal  = colors[0] if 'seaborn-darkgrid' in style else colors[1]
 c_fault1   = '#FBC15E' if 'seaborn-darkgrid' in style else colors[4]
 c_fault2   = colors[4] if 'seaborn-darkgrid' in style else colors[5]
 # Globals:
-savefig = False
+savefig = True
+# nice purple: '#988ED5'
 
-def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
+
+def plot_games(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, games_ddpg):
     fig1,ax = plt.subplots()
     fig1.canvas.manager.set_window_title("Reward versus frames")
     # ax.set_title("Average Reward - LunarLander", pad=20)
     ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = color_ddpg, linestyle = '--')
     ax.fill_between(games_ddpg, ddpg_score - ddpg_std, ddpg_score+ ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(games_ddpg, erl_score, label = 'PDERL', color=color_erl)
+    ax.plot(games_ddpg, erl_avg, label = 'PDERL (average)', color=color_erl)
+    ax.plot(games_ddpg, erl_score, linestyle = '-.', label = 'PDERL (max)', color=color_erl)
     ax.fill_between(games_ddpg, erl_score - erl_std, erl_score+ erl_std, color=color_erl, alpha=0.4)
     ax.set_ylabel("Return [-]")
     ax.set_xlabel(r"Games [-]")
@@ -51,8 +54,8 @@ def plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg):
     return fig1, ax
 
 
-def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
-    f2e = 10**4   # frames to epochs contraction for better plotting
+def plot_frames(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, frames_ddpg):
+    f2e = 1  # frames to epochs contraction for better plotting
     fig2,ax = plt.subplots()
     fig2.canvas.manager.set_window_title("Reward versus games")
     # ax.set_title("Average Reward - LunarLander", pad=20)
@@ -60,10 +63,11 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
     ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=color_ddpg, linestyle = '--')
     ax.fill_between(frames_ddpg//f2e, ddpg_score - ddpg_std, ddpg_score + ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(frames_ddpg//f2e, erl_score, label = 'PDERL', color=color_erl)
+    ax.plot(frames_ddpg//f2e, erl_avg, label = 'PDERL', color=color_erl)
+    ax.plot(frames_ddpg//f2e, erl_score, linestyle = '-.', label = 'PDERL (max)', color=color_erl)
     ax.fill_between(frames_ddpg//f2e, erl_score - erl_std, erl_score + erl_std, color=color_erl, alpha=0.4)
     ax.set_ylabel("Return [-]")
-    ax.set_xlabel(r"Epochs [$10^4$ frames]")
+    ax.set_xlabel(r"Epochs [frames]")
     ax.legend(loc = 'lower right')
     fig2.tight_layout()
 
@@ -73,18 +77,18 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg):
     return fig2, ax
 
 def plot_fault_tolerancy():
-    erl_r = 251.25; erl_std = 26.31
+    erl_r = 289.2; erl_std = 8.46
     ddpg_r = 140; ddpg_std = 110.31
-    qd_r = 200; qd_std = 70.4
+    qd_r = 150; qd_std = 135.21
 
     # broken engine fault
-    erl_r_faulty = 207.22; erl_std_faulty = 0.8* 104.17
+    erl_r_faulty = 234.38; erl_std_faulty = 90.78
     ddpg_r_faulty = 5.41; ddpg_std_faulty = 35.69
     qd_r_faulty = 44.25; qd_std_faulty = 150.30
 
     # noisy state fault
     erl_elite_r_noise = 173.41; erl_elite_std_noise = 64.19
-    erl_r_noise = 214.48; erl_std_noise = 69.1
+    erl_r_noise = 267.37; erl_std_noise = 46.92
     ddpg_r_noise = 97.64; ddpg_std_noise = 122.2
     qd_r_noise = 180.86; qd_std_noise= 108.12
 
@@ -150,22 +154,32 @@ def load_from_csv(log_file : str, agent_name):
 
 if __name__ == '__main__':
 
-
+    # LOad erl:
     api = wandb.Api()
-    run = api.run("vgavra/pderl_lunarlander/1mk42cnb")
+    run = api.run("vgavra/pderl_lunarlander/1hl8hwzx")
     df = pd.DataFrame(run.history())
     print(df.head())
     erl_score = df['test_score'];erl_std = df['test_sd']
-    frames_erl= df['frames']
-    games_erl = df['games']
+    # ddpg_score = df['ddpg_reward']; ddpg_std
+    erl_avg = df['pop_avg']
+    frames_erl= df['frames'].to_numpy()
+    games_erl = df['games'].to_numpy()
 
+    # Load ddpg:
     ddpg_score, ddpg_std, frames_ddpg,  games_ddpg = load_from_csv('pderl/logs_ddpg', agent_name = 'ddpg') 
-    erl_score, erl_std, frames_erl,  games_erl = load_from_csv('pderl/logs_s1_e3_b5e04_PD', agent_name = 'erl') 
+    # erl_score, erl_std, frames_erl,  games_erl = load_from_csv('pderl/logs_s1_e3_b5e04_PD', agent_name = 'erl') 
+
+    # Slice: 
+    stop_idx = int(0.97 * len(frames_erl))
+    frames_erl = frames_erl[:stop_idx];games_erl = games_erl[:stop_idx]
+    erl_score = erl_score[:stop_idx]
+    erl_avg = erl_avg[:stop_idx]
+    erl_std = erl_std[:stop_idx]
 
     print(f'Recorded frames: erl-{len(frames_erl)}, ddpg-{len(frames_ddpg)}')
 
     # # Slicing:
-    extra = 0.05
+    extra = 0
     assert len(games_ddpg) == len(frames_ddpg)
     if frames_ddpg[-1] > frames_erl[-1]:
         max_f = np.argwhere(frames_ddpg > (1+extra) * frames_erl[-1])[0][0]
@@ -174,19 +188,28 @@ if __name__ == '__main__':
     else:
         max_f = np.argwhere(frames_erl > (1+extra) * frames_ddpg[-1])[0][0]
         frames_erl = frames_erl[:max_f]; games_erl = games_erl[:max_f]
-        erl_score = erl_score[:max_f]; erl_std = erl_std[:max_f]
+        erl_score = erl_score[:max_f]
+        erl_std = erl_std[:max_f]
+        erl_avg = erl_avg[:max_f]
 
 
     # Resample:
-    erl_score = np.interp(frames_ddpg, frames_erl, erl_score)
-    erl_std   = np.interp(frames_ddpg, frames_erl, erl_std)
+    kind = 'cubic'
+    f = interp1d(frames_erl, erl_avg, kind , fill_value = 'extrapolate')
+    erl_avg   = f(frames_ddpg)
+    f = interp1d(frames_erl, erl_score, kind , fill_value = 'extrapolate')
+    erl_score = f(frames_ddpg)
+    # erl_score = np.interp(frames_ddpg, frames_erl, erl_score)
+    f = interp1d(frames_erl, erl_std, kind , fill_value = 'extrapolate')
+    # erl_std   = np.interp(frames_ddpg, frames_erl, erl_std)
+    erl_std = f(frames_ddpg)
 
 
     # Plotting:
     do_plot = True
     if do_plot:
-        plot_games(ddpg_score, ddpg_std, erl_score, erl_std, games_ddpg)
-        plot_frames(ddpg_score, ddpg_std, erl_score, erl_std, frames_ddpg)
-        # plot_fault_tolerancy()
+        # plot_games(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, games_ddpg)
+        # plot_frames(ddpg_score, ddpg_std, erl_score, erl_avg,  erl_std, frames_ddpg)
+        plot_fault_tolerancy()
         plt.show()
 

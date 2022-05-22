@@ -18,6 +18,7 @@ parser.add_argument('-frames', help = 'Number of frames to learn from', default 
 #  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
+parser.add_argument('-use_ounoise', help='Replace zero-mean Gaussian nosie with time-correletated OU noise', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-novelty', help='Use novelty exploration', action='store_true')
@@ -93,35 +94,25 @@ if __name__ == "__main__":
         # evaluate over all games 
         stats = agent.train()
 
-        #retrieve statistics
-        best_train_fitness = stats['best_train_fitness']
-        erl_score = stats['test_score']
-        erl_std = stats['test_sd']
-        pop_avg = stats['pop_avg']
-        elite_index = stats['elite_index']  #champion index
-        ddpg_reward = stats['ddpg_reward']
-        ddpg_std = stats['ddpg_std']
-        policy_gradient_loss = stats['pg_loss']
-        behaviour_cloning_loss = stats['bc_loss']
-        population_novelty = stats['pop_novelty']
-
         print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
-              ' Train_Max:', '%.2f'%best_train_fitness if best_train_fitness is not None else None,
-              ' Test_Max:','%.2f'%erl_score if erl_score is not None else None,
-              ' Test_SD:','%.2f'%erl_std if erl_std is not None else None,
-              ' Population_Avg:', '%.2f'%pop_avg if pop_avg is not None else None,
+              ' Train_Max:', '%.2f'%stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
+              ' Test_Max:','%.2f'%stats['test_score'] if stats['test_score'] is not None else None,
+              ' Test_SD:','%.2f'%stats['test_sd'] if stats['test_sd'] is not None else None,
+              ' Population_Avg:', '%.2f'%stats['pop_avg'] if stats['pop_avg'] is not None else None,
               '\n',
-              ' DDPG Reward:', '%.2f'%ddpg_reward,
-              ' PG Loss:', '%.4f' % policy_gradient_loss, '\n')
+              ' DDPG Reward:', '%.2f'%stats['ddpg_reward'],
+              ' PG Loss:', '%.4f' % stats['pg_loss'], '\n')
 
-        elite = agent.evolver.selection_stats['elite']/agent.evolver.selection_stats['total']
-        selected = agent.evolver.selection_stats['selected'] / agent.evolver.selection_stats['total']
-        discarded = agent.evolver.selection_stats['discarded'] / agent.evolver.selection_stats['total']
 
         # Update loggers:
         stats['frames'] = agent.num_frames; stats['games']= agent.num_games
-        wandb.log(stats)
+        stats['elite_fraction'] = agent.evolver.selection_stats['elite']/agent.evolver.selection_stats['total']
+        stats['selected_fraction'] = agent.evolver.selection_stats['selected'] / agent.evolver.selection_stats['total']
+        stats['discarded_fraction'] = agent.evolver.selection_stats['discarded'] / agent.evolver.selection_stats['total']
+        wandb.log(stats)  # main call to wandb logger
 
+        # Get index of best actor
+        elite_index = stats['elite_index']  #champion index
 
         # Save Policy
         if agent.num_games > next_save:

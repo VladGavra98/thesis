@@ -148,14 +148,14 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
 if __name__ == "__main__":
 
     # Evaluation params:
-    num_trials = 10
-    case = 'broken'
+    num_trials = 100
+    case = 'noisy'
     save_figure = True
 
     # Global paths:
     env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
-    model_path = 'pderl/logs_s1_e3_buffer5e04/evo_nets.pkl'
-    elite_path = 'pderl/logs_s1_e3_buffer5e04/elite_net.pkl'
+    model_path = 'pderl/logs_stablebaseline_params/evo_nets.pkl'
+    elite_path = 'pderl/logs_stablebaseline_params/elite_net.pkl'
     ddpg_path = 'pderl/logs_ddpg/ddpg_net.pkl'
 
     # Set parameters:
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     parameters.state_dim = env.observation_space.shape[0]
     parameters.use_ln = True
     parameters.device = torch.device('cuda')
-    setattr(parameters, 'ls', 32)
+    setattr(parameters, 'ls', 300)
 
     # Seed
     env.seed(args.seed)
@@ -190,6 +190,7 @@ if __name__ == "__main__":
     #                            ERL Population
     # -> evaluate entire popualtion on the faulty system
     # --------------------------------------------------------------------------
+
     agents_pop = load_genetic_agent(parameters, model_path, elite_path)
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
@@ -211,6 +212,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------
     #                                RL agent
     # ------------------------------------------------------------------------
+    setattr(parameters, 'ls', 32)
     rl_agent = load_rl_agent(parameters, ddpg_path)
     reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
                 render=args.render, trials=num_trials,\
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     # -----------------------------------------------------------------------
     #                                   Plotting
     # ------------------------------------------------------------------------
-    gen_heatmap(bcs_map, rewards, filename=filename, name = plotname, save_figure=save_figure)
+    # gen_heatmap(bcs_map, rewards, filename=filename, name = plotname, save_figure=save_figure)
     # gen_heatmap(bcs_map, rewards,
     #             filename='Results_pderl/Plots/population_map_brokenengine.png',\
     #             save_figure = False)

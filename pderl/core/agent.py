@@ -27,12 +27,19 @@ class Agent:
         else:
             self.replay_buffer = replay_memory.ReplayMemory(args.buffer_size, args.device)
 
-        self.ounoise = ddpg.OUNoise(args.action_dim)
+        # Define noise process:
+        if args.use_ounoise:
+            print('Usign OU noise')
+            self.noise_process = ddpg.OUNoise(args.action_dim)
+        else:
+            print('Using Gaussian noise')
+            self.noise_process = ddpg.GaussianNoise(args.action_dim, sd = args.noise_sd)
+
+        # Initialise evolutionary loop
         self.evolver = utils_ne.SSNE(self.args, self.rl_agent.critic, self.evaluate)
 
-        #Testing:
+        # Testing
         self.validation_tests = 5
-
 
         # Population novelty
         self.ns_r = 1.0
@@ -71,7 +78,7 @@ class Agent:
 
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:
-                action += self.ounoise.noise()
+                action += self.noise_process.noise()
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
@@ -226,7 +233,13 @@ class Agent_ddpg:
         else:
             self.replay_buffer = replay_memory.ReplayMemory(args.buffer_size, args.device)
 
-        self.ounoise = ddpg.OUNoise(args.action_dim)
+        # Define noise process:
+        if args.use_ounoise:
+            print('Usign OU noise')
+            self.noise_process = ddpg.OUNoise(args.action_dim)
+        else:
+            print('Using Gaussian noise')
+            self.noise_process = ddpg.GaussianNoise(args.action_dim, sd = self.rl_agent.noise_sd)
 
         # Testing:
         self.validation_freq  = 30  # let it equal to the population size for better comaprison
@@ -261,7 +274,7 @@ class Agent_ddpg:
 
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:
-                action += self.ounoise.noise()
+                action += self.noise_process.noise()
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment

@@ -19,6 +19,7 @@ class Parameters:
         self.render = cla.render
         self.env_name = cla.env
         self.save_periodic = cla.save_periodic if cla.save_periodic else False
+        
 
         # Number of Frames to Run
         if  cla.frames:
@@ -54,16 +55,18 @@ class Parameters:
 
         # ========================================== DDPG Params =============================================
         self.use_ln = True
-        self.gamma = 0.99
+        self.gamma = 0.98
         self.tau = 0.001
         self.seed = cla.seed
         self.batch_size = 128
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 50000
-
+        self.buffer_size = 200000  #50000
+        self.noise_sd = 0.1
+        self.use_ounoise = cla.use_ounoise
+        
         if 'lunarlander' or 'car' in cla.env.lower():
-            self.ls = 32
+            self.ls = 300
         else:
             self.ls = 128
         print(self.ls)

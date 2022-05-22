@@ -89,6 +89,7 @@ class Actor(nn.Module):
         if init:
             self.w_out.weight.data.mul_(0.1)
             self.w_out.bias.data.mul_(0.1)
+            self.novelty = 0.
 
         self.to(self.args.device)
 
@@ -115,7 +116,8 @@ class Actor(nn.Module):
     def get_novelty(self, batch):
         state_batch, action_batch, _, _, _ = batch
         novelty = torch.mean(torch.sum((action_batch - self.forward(state_batch))**2, dim=-1))
-        return novelty.item()
+        self.novelty = novelty.item()
+        return self.novelty
 
     # function to return current pytorch gradient in same order as genome's flattened parameter vector
     def extract_grad(self):
@@ -214,11 +216,11 @@ class DDPG(object):
 
         self.actor = Actor(args, init=True)
         self.actor_target = Actor(args, init=True)
-        self.actor_optim = Adam(self.actor.parameters(), lr=0.5e-4)
+        self.actor_optim = Adam(self.actor.parameters(), lr=0.5e-3)
 
         self.critic = Critic(args)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=0.5e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()
@@ -299,6 +301,23 @@ class LayerNorm(nn.Module):
         mean = x.mean(-1, keepdim=True)
         std = x.std(-1, keepdim=True)
         return self.gamma * (x - mean) / (std + self.eps) + self.beta
+
+
+class GaussianNoise:
+
+    def __init__(self, action_dimension, sd=0.1, mu=0):
+        self.action_dimension = action_dimension
+        self.sd= sd
+        self.mu = mu
+
+        self.reset()
+
+    def reset(self):
+        self.state = np.ones(self.action_dimension) * self.mu
+
+    def noise(self):
+        return np.random.normal(self.mu,self.sd,self.action_dimension)
+
 
 class OUNoise:
 
