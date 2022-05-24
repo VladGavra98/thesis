@@ -41,10 +41,14 @@
 - [x] Finish writing about PDERL: 
   - [x] figure
   - [x] tricks
-  - [ ] results
+  - [x] results
+
+
+> week12: 23/05 - 27/05
+- [ ] Rerun archive map on LunarLander Nominal
+- [ ] Explain the testing environment
 - [ ] Write DRL in flight Control
-
-
+- [ ] 
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
 ## Report Writing:
 - [x] Novelty search and QD intro
