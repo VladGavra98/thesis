@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
-import wandb
+from sys import platform
 import pandas as pd
 from pathlib import Path
 
@@ -40,12 +40,13 @@ def plot_games(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, games_ddpg):
     ax.plot(games_ddpg, ddpg_score, label = 'DDPG', color = color_ddpg, linestyle = '--')
     ax.fill_between(games_ddpg, ddpg_score - ddpg_std, ddpg_score+ ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(games_ddpg, erl_avg, label = 'PDERL (average)', color=color_erl)
-    ax.plot(games_ddpg, erl_score, linestyle = '-.', label = 'PDERL (max)', color=color_erl)
+    ax.plot(games_ddpg, erl_avg, linestyle = '-.', label = 'PDERL (average)', color=color_erl)
+    ax.plot(games_ddpg, erl_score, linestyle = '-', label = 'PDERL (max)', color=color_erl)
     ax.fill_between(games_ddpg, erl_score - erl_std, erl_score+ erl_std, color=color_erl, alpha=0.4)
-    ax.set_ylabel("Return [-]")
+    ax.set_ylabel("Reward [-]")
     ax.set_xlabel(r"Games [-]")
     ax.legend(loc = 'lower right')
+    ax.set_ylim(-700,400)
     fig1.tight_layout()
 
     if savefig:
@@ -63,11 +64,12 @@ def plot_frames(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, frames_ddpg):
     ax.plot(frames_ddpg//f2e, ddpg_score, label = 'DDPG', color=color_ddpg, linestyle = '--')
     ax.fill_between(frames_ddpg//f2e, ddpg_score - ddpg_std, ddpg_score + ddpg_std, color=color_ddpg,alpha=0.4)
 
-    ax.plot(frames_ddpg//f2e, erl_avg, label = 'PDERL', color=color_erl)
-    ax.plot(frames_ddpg//f2e, erl_score, linestyle = '-.', label = 'PDERL (max)', color=color_erl)
+    ax.plot(frames_ddpg//f2e, erl_avg,linestyle = '-.', label = 'PDERL', color=color_erl)
+    ax.plot(frames_ddpg//f2e, erl_score, linestyle = '-', label = 'PDERL (max)', color=color_erl)
     ax.fill_between(frames_ddpg//f2e, erl_score - erl_std, erl_score + erl_std, color=color_erl, alpha=0.4)
-    ax.set_ylabel("Return [-]")
+    ax.set_ylabel("Reward [-]")
     ax.set_xlabel(r"Epochs [frames]")
+    ax.set_ylim(-700,400)
     ax.legend(loc = 'lower right')
     fig2.tight_layout()
 
@@ -119,7 +121,7 @@ def plot_fault_tolerancy():
     # delimiter
     c_background = '#98989B'#(199/255, 199/255, 204/255)
     plt.axvline(x=1.5, color = c_background, linestyle = '-')
-    ax.set_ylabel('Episode Return [-]')
+    ax.set_ylabel('Episode Reward [-]')
 
 
     # Legend
@@ -154,7 +156,8 @@ def load_from_csv(log_file : str, agent_name):
 
 if __name__ == '__main__':
 
-    # LOad erl:
+    # Load erl:
+    import wandb
     api = wandb.Api()
     run = api.run("vgavra/pderl_lunarlander/1hl8hwzx")
     df = pd.DataFrame(run.history())
@@ -170,11 +173,13 @@ if __name__ == '__main__':
     # erl_score, erl_std, frames_erl,  games_erl = load_from_csv('pderl/logs_s1_e3_b5e04_PD', agent_name = 'erl') 
 
     # Slice: 
+    start_idx = 0
     stop_idx = int(0.97 * len(frames_erl))
-    frames_erl = frames_erl[:stop_idx];games_erl = games_erl[:stop_idx]
-    erl_score = erl_score[:stop_idx]
-    erl_avg = erl_avg[:stop_idx]
-    erl_std = erl_std[:stop_idx]
+    frames_erl = frames_erl[start_idx:stop_idx]
+    games_erl = games_erl[start_idx:stop_idx]
+    erl_score = erl_score[start_idx:stop_idx]
+    erl_avg = erl_avg[start_idx:stop_idx]
+    erl_std = erl_std[start_idx:stop_idx]
 
     print(f'Recorded frames: erl-{len(frames_erl)}, ddpg-{len(frames_ddpg)}')
 
@@ -207,9 +212,10 @@ if __name__ == '__main__':
 
     # Plotting:
     do_plot = True
+    start_idx = 6
     if do_plot:
-        # plot_games(ddpg_score, ddpg_std, erl_score, erl_avg, erl_std, games_ddpg)
-        # plot_frames(ddpg_score, ddpg_std, erl_score, erl_avg,  erl_std, frames_ddpg)
-        plot_fault_tolerancy()
+        plot_games(ddpg_score[start_idx:], ddpg_std[start_idx:], erl_score[start_idx:], erl_avg[start_idx:], erl_std[start_idx:], games_ddpg[start_idx:])
+        plot_frames(ddpg_score[start_idx:], ddpg_std[start_idx:], erl_score[start_idx:], erl_avg[start_idx:],  erl_std[start_idx:], frames_ddpg[start_idx:])
+        # plot_fault_tolerancy()
         plt.show()
 
