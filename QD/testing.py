@@ -44,31 +44,97 @@ Usage:
 Help:
     python lunar_lander.py --help
 """
-# basic OS interaction
+
 import time
 from pathlib import Path
 
-# python standard modules for AI
+
 import gym
 import numpy as np
-from tqdm import tqdm
+import pandas as pd
 from dask.distributed import Client, LocalCluster
 
-# pyribs
 from ribs.archives import GridArchive
-from ribs.emitters import ImprovementEmitter, OptimizingEmitter, RandomDirectionEmitter
+from ribs.emitters import ImprovementEmitter
 from ribs.optimizers import Optimizer
 
-# my modules
-from QD.saving_utils import *
 
-from QD.agents import QD_agent, QD_agent_NN
-from QD.eval_utils import run_evaluation
-
-
+from saving_utils import * 
+from agents import QD_agent, QD_agent_NN
 
 
 env_name = "LunarLanderContinuous-v2"
+def simulate(model, seed=None, video_env=None):
+    """Simulates the lunar lander model.
+
+    Args:
+        model (np.ndarray): The array of weights for the linear policy.
+        seed (int): The seed for the environment.
+        video_env (gym.Env): If passed in, this will be used instead of creating
+            a new env. This is used primarily for recording video during
+            evaluation.
+    Returns:
+        total_reward (float): The reward accrued by the lander throughout its
+            trajectory.
+        impact_x_pos (float): The x position of the lander when it touches the
+            ground for the first time.
+        impact_y_vel (float): The y velocity of the lander when it touches the
+            ground for the first time.
+    """
+    if video_env is None:
+        # Since we are using multiple processes, it is simpler if each worker
+        # just creates their own copy of the environment instead of trying to
+        # share the environment. This also makes the function "pure."
+        env = gym.make("LunarLander-v2")
+    else:
+        env = video_env
+
+    if seed is not None:
+        env.seed(seed)
+
+    action_dim = env.action_space.n
+    obs_dim = env.observation_space.shape[0]
+    model = model.reshape((action_dim, obs_dim))
+
+    total_reward = 0.0
+    impact_x_pos = None
+    impact_y_vel = None
+    all_y_vels = []
+    obs = env.reset()
+    done = False
+
+    while not done:
+        action = model @ obs # Linear policy.
+        obs, reward, done, _ = env.step(action)
+        total_reward += reward
+
+        # Refer to the definition of state here:
+        # https://github.com/openai/gym/blob/master/gym/envs/box2d/lunar_lander.py#L306
+        x_pos = obs[0]
+        y_vel = obs[3]
+        leg0_touch = bool(obs[6])
+        leg1_touch = bool(obs[7])
+        all_y_vels.append(y_vel)
+
+        # Check if the lunar lander is impacting for the first time.
+        if impact_x_pos is None and (leg0_touch or leg1_touch):
+            impact_x_pos = x_pos
+            impact_y_vel = y_vel
+
+    # If the lunar lander did not land, set the x-pos to the one from the final
+    # timestep, and set the y-vel to the max y-vel (we use min since the lander
+    # goes down).
+    if impact_x_pos is None:
+        impact_x_pos = x_pos
+        impact_y_vel = min(all_y_vels)
+
+    # Only close the env if it was not a video env.
+    if video_env is None:
+        env.close()
+
+    return total_reward, impact_x_pos, impact_y_vel
+
+
 def create_optimizer(seed, n_emitters, sigma0, batch_size):
     """Creates the Optimizer based on given configurations.
 
@@ -79,9 +145,9 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
         and a GridArchive).
     """
     env = gym.make(env_name)
-    action_dim = env.action_space.shape[0]
+    action_dim = env.action_space.n
     obs_dim = env.observation_space.shape[0]
-    print(f'Action-sapce dim: {action_dim} \nObservation space dim: {obs_dim}')
+
     archive = GridArchive(
         [50, 50],  # 50 bins in each dimension.
         [(-1.0, 1.0), (-3.0, 0.0)],  # (-1, 1) for x-pos and (-3, 0) for y-vel.
@@ -95,11 +161,11 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
     # avoids this problem altogether.
     seeds = ([None] * n_emitters
              if seed is None else [seed + i for i in range(n_emitters)])
-    initial_actor = QD_agent(env)
+    initial_model = np.zeros((action_dim, obs_dim))
     emitters = [
         ImprovementEmitter(
             archive,
-            initial_actor.flatten(),
+            initial_model.flatten(),
             sigma0=sigma0,
             batch_size=batch_size,
             seed=s,
@@ -107,10 +173,10 @@ def create_optimizer(seed, n_emitters, sigma0, batch_size):
     ]
 
     optimizer = Optimizer(archive, emitters)
-    return optimizer
+    return optimizer, env
 
 
-def run_search(client, optimizer, env, iterations, log_freq):
+def run_search(client, optimizer, env_seed, iterations, log_freq):
     """Runs the QD algorithm for the given number of iterations.
 
     Args:
@@ -141,8 +207,8 @@ def run_search(client, optimizer, env, iterations, log_freq):
     }
 
     start_time = time.time()
-
-    for itr in tqdm(range(1, iterations + 1)):
+    
+    for itr in range(1, iterations + 1):
         # Request models from the optimizer.
         sols = optimizer.ask()
 
@@ -151,10 +217,9 @@ def run_search(client, optimizer, env, iterations, log_freq):
 
         # Ask the Dask client to distribute the simulations among the Dask
         # workers, then gather the results of the simulations.
-        # print(sols.shape)
-        
-        futures = client.map(lambda actor: simulate(actor, env), sols)
+        futures = client.map(lambda model: simulate(model, env_seed), sols)
         results = client.gather(futures)
+     
 
         # Process the results.
         for obj, impact_x_pos, impact_y_vel in results:
@@ -165,7 +230,7 @@ def run_search(client, optimizer, env, iterations, log_freq):
         optimizer.tell(objs, bcs)
 
         # Logging.
-        # progress()
+
         if itr % log_freq == 0 or itr == iterations:
             elapsed_time = time.time() - start_time
             metrics["Max Score"]["x"].append(itr)
@@ -182,18 +247,54 @@ def run_search(client, optimizer, env, iterations, log_freq):
 
 
 
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#                                    Main
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+def run_evaluation(outdir, env_seed):
+    """Simulates 10 random archive solutions and saves videos of them.
+
+    Videos are saved to outdir / videos.
+
+    Args:
+        outdir (Path): Path object for the output directory from which to
+            retrieve the archive and save videos.
+        env_seed (int): Seed for the environment.
+    """
+    df = pd.read_csv(outdir / "archive.csv")
+    indices = np.random.permutation(len(df))[:10]
+
+    # Use a single env so that all the videos go to the same directory.
+    video_env = gym.wrappers.Monitor(
+        gym.make(env_name),
+        str(outdir / "videos"),
+        force=True,
+        # Default is to write the video for "cubic" episodes -- 0,1,8,etc (see
+        # https://github.com/openai/gym/blob/master/gym/wrappers/monitor.py#L54).
+        # This will ensure all the videos are written.
+        video_callable=lambda idx: True,
+    )
+
+    for idx in indices:
+        model = np.array(df.loc[idx, "solution_0":])
+        reward, impact_x_pos, impact_y_vel = simulate(model, env_seed,
+                                                      video_env)
+        print(f"=== Index {idx} ===\n"
+              "Model:\n"
+              f"{model}\n"
+              f"Reward: {reward}\n"
+              f"Impact x-pos: {impact_x_pos}\n"
+              f"Impact y-vel: {impact_y_vel}\n")
+
+    video_env.close()
+
+
 def lunar_lander_main(workers=4,
                       env_seed=1339,
-                      iterations=400,
+                      iterations=500,
                       log_freq=25,
                       n_emitters=5,
-                      batch_size=25,
+                      batch_size=30,
                       sigma0=1.0,
                       seed=None,
-                      outdir="lunar_lander_output"):
+                      outdir="lunar_lander_output",
+                      run_eval=False):
     """Uses CMA-ME to train linear agents in Lunar Lander.
 
     Args:
@@ -214,12 +315,14 @@ def lunar_lander_main(workers=4,
     outdir = Path(outdir)
     outdir.mkdir(exist_ok=True)
 
+    if run_eval:
+        run_evaluation(outdir, env_seed)
+        return
+
     # Setup Dask. The client connects to a "cluster" running on this machine.
     # The cluster simply manages several concurrent worker processes. If using
     # Dask across many workers, we would set up a more complicated cluster and
     # connect the client to it.
-    print(
-        f"Total nubmer of simualtions: {iterations * batch_size * n_emitters}")
     cluster = LocalCluster(
         processes=True,  # Each worker is a process.
         n_workers=workers,  # Create this many worker processes.
@@ -227,40 +330,16 @@ def lunar_lander_main(workers=4,
     )
     client = Client(cluster)
 
-    # Make env:
-    env = gym.make(env_name)
-    if env_seed is not None:
-        env.seed(env_seed)
-
-    # CMA-ME
+    # CMA-ME.
     optimizer = create_optimizer(seed, n_emitters, sigma0, batch_size)
-    metrics = run_search(client, optimizer, env, iterations, log_freq)
+    metrics = run_search(client, optimizer, env_seed, iterations, log_freq)
 
-    # Outputs
+    # Outputs.
     optimizer.archive.as_pandas().to_csv(outdir / "archive.csv")
     save_ccdf(optimizer.archive, str(outdir / "archive_ccdf.png"))
     save_heatmap(optimizer.archive, str(outdir / "heatmap.png"))
     save_metrics(outdir, metrics)
 
-    return 0
-
 
 if __name__ == "__main__":
-    # Declare folder for results
-    outdir_path = './Results_QD/test_NN'
-
-    # Train
-    lunar_lander_main(outdir=outdir_path, workers = 5)
-
-    # Evaluate
-    # noise_intensity = 0.05
-    # extra_args = {'broken_engine' : False, 
-    #             'state_noise' : False, 
-    #             'noise_intensity': 0.05}
-
-    # reward_mean, reward_std, bcs = run_evaluation(
-    #                             outdir=outdir_path, trials=10, kwargs = extra_args)
-    # print(f"Reward: {reward_mean:.2f}\n",
-    #       f"Reward STD: {reward_std:.2f}\n",
-    #       f"Impact x-pos: {bcs[0]:.2f}\n",
-    #       f"Impact y-vel: {bcs[1]:.2f}\n")
+    lunar_lander_main()
