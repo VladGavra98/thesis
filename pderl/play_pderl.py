@@ -24,9 +24,17 @@ parser.add_argument('-load_champion', help='Loads the best performingactor',
                     action='store_true', default=False)
 args = parser.parse_args()
 
-plt.style.use('ggplot')
+style = 'ggplot'
+plt.style.use(style.lower()) 
 plt.rcParams.update({'font.size': 12})
+# plt.rcParams['figure.dpi'] = 200
 
+
+# Global paths:
+env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
+model_path = 'pderl/logs_stablebaseline_params/evo_nets.pkl'
+elite_path = 'pderl/logs_stablebaseline_params/elite_net.pkl'
+ddpg_path = 'pderl/logs_ddpg/ddpg_net.pkl'
 
 def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
     """ Evaualte an individual for a couple of trails/games.
@@ -101,7 +109,7 @@ def gen_heatmap(bcs_map: np.ndarray, rewards: np.ndarray, filename: str, save_fi
     ax.set_xlabel(r"Impact $x$")
 
     cbar = fig.colorbar(img, orientation='vertical')
-    cbar.ax.set_title('Mean Return')
+    cbar.ax.set_title('Mean Reward')
     plt.tight_layout()
 
     if save_figure:
@@ -123,11 +131,11 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
     
     if 'nominal' in case.lower():
         print('Current case: nominal')
-        extra_args = {'broken_engine' : False, 'state_noise' : False, 'noise_intensity': 0.05}
+        extra_args = {'broken_engine' : False, 'state_noise' : False}
         plotname = 'nominal'
         filename = plotfolder + '/map.png'
 
-    elif 'noisy' in case.lower():
+    elif 'noisy' or 'noise' in case.lower():
         print('Current case: faulty system - noisy state')
         extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': 0.05}
         plotname = 'noisy state (F1)'
@@ -135,7 +143,7 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
 
     elif 'broken' in case.lower():
         print('Current case: faulty system - broken engine')
-        extra_args = {'broken_engine' : True, 'state_noise' : False, 'noise_intensity': 0.05}
+        extra_args = {'broken_engine' : True, 'state_noise' : False}
         plotname = 'broken engine (F2)'
         filename = plotfolder + '/map_brokenengine.png'
 
@@ -145,18 +153,71 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
     return extra_args, plotname, filename
 
 
+def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : bool = False):
+
+    # generate a comparative map based o nthe case
+    extra_args, plotname,filename = _extract_case('nominal')  
+
+    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    rewards, bcs_map, rewards_std = [], [], []
+    for agent in tqdm(agents_pop):  # evaluate each member for # trials
+        r_mean, r_std, bcs = evaluate(agent.actor, env,
+                render=args.render, trials=num_trials,\
+                     kwargs = extra_args)
+        rewards.append(r_mean)
+        bcs_map.append(bcs)
+        rewards_std.append(r_std)
+
+    bcs_map_old = np.asarray(bcs_map)
+
+    extra_args, plotname, filename = _extract_case(case)  
+    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    rewards, bcs_map, rewards_std = [], [], []
+    for agent in tqdm(agents_pop):  # evaluate each member for # trials
+        r_mean, r_std, bcs = evaluate(agent.actor, env,
+                render=args.render, trials=num_trials,\
+                     kwargs = extra_args)
+        rewards.append(r_mean)
+        bcs_map.append(bcs)
+        rewards_std.append(r_std)
+
+    rewards = np.asarray(rewards)
+    bcs_map = np.asarray(bcs_map)
+    rewards_std = np.asarray(rewards_std)
+    new_elite = np.argmax(rewards)
+
+    print(f'New elite: {rewards[new_elite]:.2f}, with SD = {rewards_std[new_elite]:.2f}\n')
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    img = ax.scatter(bcs_map[:, 0], bcs_map[:, 1],
+                        c=rewards, marker='s', cmap='magma', s= 20)
+    u = bcs_map[:, 0] - bcs_map_old[:, 0]
+    v = bcs_map[:, 1] - bcs_map_old[:, 1]
+    cbar = fig.colorbar(img, orientation='vertical')
+    cbar.ax.set_title('Mean Reward')
+
+
+    img= ax.quiver(bcs_map[:, 0], bcs_map[:, 1],u,v, alpha = 0.5, pivot = 'tip', width = 0.003)
+    
+    ax.set_title('Archive: ' + str(plotname))
+
+    ax.invert_yaxis()  # Makes more sense if larger velocities are on top.
+    ax.set_ylabel(r"Impact $\dot{y}$")
+    ax.set_xlabel(r"Impact $x$")
+
+    plt.tight_layout()
+
+    if save_figure:
+        fig.savefig(filename)
+        print('Figured saved as ' + filename)
+
+    return bcs_map, rewards
+
+
+
+
+
 if __name__ == "__main__":
-
-    # Evaluation params:
-    num_trials = 100
-    case = 'noisy'
-    save_figure = True
-
-    # Global paths:
-    env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
-    model_path = 'pderl/logs_stablebaseline_params/evo_nets.pkl'
-    elite_path = 'pderl/logs_stablebaseline_params/elite_net.pkl'
-    ddpg_path = 'pderl/logs_ddpg/ddpg_net.pkl'
 
     # Set parameters:
     parameters = Parameters(args, init=False)
@@ -173,6 +234,10 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # Evaluation params:
+    num_trials = 10
+    case = 'noisy_compare'
+    save_figure = False
 
     extra_args, plotname,filename = _extract_case(case)    
 
@@ -191,22 +256,30 @@ if __name__ == "__main__":
     # -> evaluate entire popualtion on the faulty system
     # --------------------------------------------------------------------------
 
-    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
-    rewards, bcs_map, rewards_std = [], [], []
-    for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent.actor, env,
-                render=args.render, trials=num_trials,\
-                     kwargs = extra_args)
-        rewards.append(r_mean)
-        bcs_map.append(bcs)
-        rewards_std.append(r_std)
+    if 'comp' in case.lower():
+        # comparative plot  to the nominal case (with arrows) 
+        bcs_map, rewards = gen_comparative_map(parameters, num_trials, case, save_figure=save_figure)
+    else:
+        # simpel plot
+        extra_args, plotname,filename = _extract_case(case)  
+        agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+        rewards, bcs_map, rewards_std = [], [], []
+        for agent in tqdm(agents_pop):  # evaluate each member for # trials
+            r_mean, r_std, bcs = evaluate(agent.actor, env,
+                    render=args.render, trials=num_trials,\
+                        kwargs = extra_args)
+            rewards.append(r_mean)
+            bcs_map.append(bcs)
+            rewards_std.append(r_std)
 
-    rewards = np.asarray(rewards)
-    bcs_map = np.asarray(bcs_map)
-    rewards_std = np.asarray(rewards_std)
-    new_elite = np.argmax(rewards)
+        rewards = np.asarray(rewards)
+        bcs_map = np.asarray(bcs_map)
+        rewards_std = np.asarray(rewards_std)
+        new_elite = np.argmax(rewards)
 
-    print(f'New elite: {rewards[new_elite]:.2f}, with SD = {rewards_std[new_elite]:.2f}\n')
+        # Plotting the nominal case
+        print(f'New elite: {rewards[new_elite]:.2f}, with SD = {rewards_std[new_elite]:.2f}\n')
+        gen_heatmap(bcs_map, rewards, filename=filename, name = plotname, save_figure=save_figure)
 
 
     # ------------------------------------------------------------------------
@@ -223,7 +296,7 @@ if __name__ == "__main__":
     # -----------------------------------------------------------------------
     #                                   Plotting
     # ------------------------------------------------------------------------
-    # gen_heatmap(bcs_map, rewards, filename=filename, name = plotname, save_figure=save_figure)
+    
     # gen_heatmap(bcs_map, rewards,
     #             filename='Results_pderl/Plots/population_map_brokenengine.png',\
     #             save_figure = False)
