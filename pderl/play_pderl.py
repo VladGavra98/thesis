@@ -126,22 +126,23 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
     Returns:
         tuple: argumetns to be passed to environment, name for plottign function
     """    
+
     case = str(case)
     filename = 'Results_pderl/Plots/population_map.png'
-    
+
     if 'nominal' in case.lower():
         print('Current case: nominal')
         extra_args = {'broken_engine' : False, 'state_noise' : False}
         plotname = 'nominal'
         filename = plotfolder + '/map.png'
 
-    elif 'noisy' or 'noise' in case.lower():
+    elif case.lower().find('nois') !=-1:
         print('Current case: faulty system - noisy state')
         extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': 0.05}
         plotname = 'noisy state (F1)'
         filename = plotfolder + '/map_noisystate.png'
 
-    elif 'broken' in case.lower():
+    elif case.lower().find('broken') != -1:
         print('Current case: faulty system - broken engine')
         extra_args = {'broken_engine' : True, 'state_noise' : False}
         plotname = 'broken engine (F2)'
@@ -181,30 +182,36 @@ def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : 
         bcs_map.append(bcs)
         rewards_std.append(r_std)
 
-    rewards = np.asarray(rewards)
-    bcs_map = np.asarray(bcs_map)
-    rewards_std = np.asarray(rewards_std)
+    rewards = np.asarray(rewards);bcs_map = np.asarray(bcs_map);rewards_std = np.asarray(rewards_std)
     new_elite = np.argmax(rewards)
 
     print(f'New elite: {rewards[new_elite]:.2f}, with SD = {rewards_std[new_elite]:.2f}\n')
 
+    # Plotting: 
     fig, ax = plt.subplots(figsize=(8, 6))
-    img = ax.scatter(bcs_map[:, 0], bcs_map[:, 1],
-                        c=rewards, marker='s', cmap='magma', s= 20)
+
+    # draw arrows first
     u = bcs_map[:, 0] - bcs_map_old[:, 0]
     v = bcs_map[:, 1] - bcs_map_old[:, 1]
+    width = 0.015
+    for i in range(len(bcs_map[:,0])):
+        ax.arrow(bcs_map_old[i, 0], bcs_map_old[i, 1],u[i],v[i], head_width = 0.7* width, head_length = width, color = (0,0,0,0.4), length_includes_head = True)
+
+    img = ax.scatter(bcs_map_old[:, 0], bcs_map_old[:, 1],
+                        c=rewards, marker='o', cmap='magma', s= 30, label = 'Initial BC')
+    img = ax.scatter(bcs_map[:, 0], bcs_map[:, 1],
+                        c=rewards, marker='s', cmap='magma', s= 40, label = 'Final BC')
+
     cbar = fig.colorbar(img, orientation='vertical')
     cbar.ax.set_title('Mean Reward')
 
 
-    img= ax.quiver(bcs_map[:, 0], bcs_map[:, 1],u,v, alpha = 0.5, pivot = 'tip', width = 0.003)
-    
     ax.set_title('Archive: ' + str(plotname))
 
     ax.invert_yaxis()  # Makes more sense if larger velocities are on top.
     ax.set_ylabel(r"Impact $\dot{y}$")
     ax.set_xlabel(r"Impact $x$")
-
+    plt.legend(loc = 'upper center')
     plt.tight_layout()
 
     if save_figure:
@@ -236,23 +243,26 @@ if __name__ == "__main__":
 
     # Evaluation params:
     num_trials = 10
-    case = 'noisy_compare'
+    case = 'broken_compare'
     save_figure = False
+    evaluate_rl = False
+    evaluate_elite = False
 
-    extra_args, plotname,filename = _extract_case(case)    
 
     # ------------------------------------------------------------------------
-    #                                Elite agent
+    #                           Elite agent
     # -> evalaute the best perforing controller on the nominal system
     # ------------------------------------------------------------------------
-    elite_agent = load_rl_agent(parameters, elite_path)
-    reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
-                render=args.render, trials=num_trials, kwargs = extra_args)
+    if evaluate_elite:
+        extra_args, plotname,filename = _extract_case(case)    
+        elite_agent = load_rl_agent(parameters, elite_path)
+        reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
+                    render=args.render, trials=num_trials, kwargs = extra_args)
 
-    print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
+        print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 
     # --------------------------------------------------------------------------
-    #                            ERL Population
+    #                         ERL Population
     # -> evaluate entire popualtion on the faulty system
     # --------------------------------------------------------------------------
 
@@ -283,15 +293,16 @@ if __name__ == "__main__":
 
 
     # ------------------------------------------------------------------------
-    #                                RL agent
+    #                             RL agent
     # ------------------------------------------------------------------------
-    setattr(parameters, 'ls', 32)
-    rl_agent = load_rl_agent(parameters, ddpg_path)
-    reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
-                render=args.render, trials=num_trials,\
-                   kwargs = extra_args)
+    if evaluate_rl:
+        setattr(parameters, 'ls', 32)
+        rl_agent = load_rl_agent(parameters, ddpg_path)
+        reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
+                    render=args.render, trials=num_trials,\
+                    kwargs = extra_args)
 
-    print(f'RL (ddpg):{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
+        print(f'RL (ddpg):{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
 
     # -----------------------------------------------------------------------
     #                                   Plotting
