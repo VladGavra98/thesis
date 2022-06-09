@@ -33,9 +33,9 @@ plt.rcParams.update({'font.size': 12})
 
 # Global paths:
 env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
-model_path = PurePath('pderl/logs_stablebaseline_params/evo_nets.pkl')
-elite_path = PurePath('pderl/logs_stablebaseline_params/elite_net.pkl')
-ddpg_path = PurePath('pderl/logs_ddpg/ddpg_net.pkl')
+model_path = PurePath('logs/logs_s1_e3_b5e04_PD/evo_nets.pkl')
+elite_path = PurePath('logs/logs_s1_e3_b5e04_PD/elite_net.pkl')
+ddpg_path = PurePath('logs/logs_ddpg/ddpg_net.pkl')
 
 def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
     """ Evaualte an individual for a couple of trails/games.
@@ -119,7 +119,7 @@ def gen_heatmap(bcs_map: np.ndarray, rewards: np.ndarray, filename: str, save_fi
         print('Figured saved.')
 
 
-def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple:
+def _extract_case(case : str, plotfolder : Path = PurePath('Results')) -> tuple:
     """Translate case into simulation paramaters:
 
     Args:
@@ -130,25 +130,25 @@ def _extract_case(case : str, plotfolder : str = 'Results_pderl/Plots') -> tuple
     """    
 
     case = str(case)
-    filename = 'Results_pderl/Plots/population_map.png'
+    filename = plotfolder / PurePath('/Plots/population_map.png')
 
     if 'nominal' in case.lower():
         print('Current case: nominal')
         extra_args = {'broken_engine' : False, 'state_noise' : False}
         plotname = 'nominal'
-        filename = plotfolder + '/map.png'
+        filename = plotfolder / PurePath('/map.png')
 
     elif case.lower().find('nois') !=-1:
         print('Current case: faulty system - noisy state')
         extra_args = {'broken_engine' : False, 'state_noise' : True, 'noise_intensity': 0.05}
         plotname = 'noisy state (F1)'
-        filename = plotfolder + '/map_noisystate.png'
+        filename = plotfolder / PurePath('/map_noisystate.png')
 
     elif case.lower().find('broken') != -1:
         print('Current case: faulty system - broken engine')
         extra_args = {'broken_engine' : True, 'state_noise' : False}
         plotname = 'broken engine (F2)'
-        filename = plotfolder + '/map_brokenengine.png'
+        filename = plotfolder / PurePath('/map_brokenengine.png')
 
     else:
         Warning('No case provided for evaluation!')
