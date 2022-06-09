@@ -9,6 +9,7 @@ import gym
 import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from pathlib import Path, PurePath
 
 # my envs
 from envs.lunarlander import simulate
@@ -32,9 +33,9 @@ plt.rcParams.update({'font.size': 12})
 
 # Global paths:
 env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
-model_path = 'pderl/logs_stablebaseline_params/evo_nets.pkl'
-elite_path = 'pderl/logs_stablebaseline_params/elite_net.pkl'
-ddpg_path = 'pderl/logs_ddpg/ddpg_net.pkl'
+model_path = PurePath('pderl/logs_stablebaseline_params/evo_nets.pkl')
+elite_path = PurePath('pderl/logs_stablebaseline_params/elite_net.pkl')
+ddpg_path = PurePath('pderl/logs_ddpg/ddpg_net.pkl')
 
 def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
     """ Evaualte an individual for a couple of trails/games.
@@ -63,6 +64,7 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict =
 
 
 def load_genetic_agent(args, model_path: str, elite_path: str = None):
+    
     actor_path = os.path.join(model_path)
     agents_pop = []
     checkpoint = torch.load(actor_path)
