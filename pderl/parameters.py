@@ -26,15 +26,7 @@ class Parameters:
             self.num_frames = cla.frames
         else:
             self.num_frames = 1000000
-        # if cla.env == 'Hopper-v2':
-        #     self.num_frames = 1500000
-        # elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
-        #     self.num_frames = 3000000
-        # elif 'lunarlander' in cla.env.lower():
-        #     self.num_frames = 600000
-        # else:
-        #     self.num_frames = 500000
-        # # NOTE reduced number of total frames
+
 
         # Synchronization
         if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2'or 'lunar' in cla.env.lower():
@@ -69,7 +61,6 @@ class Parameters:
             self.ls = 300
         else:
             self.ls = 128
-        print(self.ls)
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -129,11 +120,17 @@ class Parameters:
             os.makedirs(self.save_foldername)
 
     def write_params(self, stdout=True):
-        # Dump all the hyper-parameters in a file.
+        """ Transfer parmaters obejct to dict. 
+        Args:
+            stdout (bool, optional): Print. Defaults to True.
+
+        Returns:
+            dict: Parameters dict
+        """
         params = pprint.pformat(vars(self), indent=4)
         if stdout:
             print(params)
-        return params
+        return self.__dict__
 
         with open(os.path.join(self.save_foldername, 'info.txt'), 'w') as f:
             f.write(params)

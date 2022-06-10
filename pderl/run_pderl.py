@@ -61,9 +61,6 @@ def save_agents(parameters : object, elite_index : int = None):
 
 if __name__ == "__main__":
     cla = parser.parse_args()
-
-    # strat trackers
-    wandb.init(project="pderl_lunarlander", entity="vgavra", name = cla.run_name)
     parameters = Parameters(cla)  # Inject the cla arguments in the parameters object
 
     # Create Env
@@ -74,7 +71,11 @@ if __name__ == "__main__":
 
     # Write the parameters to a the info file and print them
     params_dict = parameters.write_params(stdout=True)
-    wandb.config = params_dict
+
+    # strat trackers
+    print(params_dict)
+    wandb.init(project="pderl_td3", entity="vgavra", name = cla.run_name,\
+         config= params_dict)
 
     # Seed
     env.seed(parameters.seed)
