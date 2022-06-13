@@ -22,7 +22,7 @@ class Parameters:
         
 
         # Number of Frames to Run
-        if  cla.frames:
+        if cla.frames:
             self.num_frames = cla.frames
         else:
             self.num_frames = 1_000_000
@@ -46,7 +46,7 @@ class Parameters:
         self.use_ddpg = cla.use_ddpg   # default should be False
 
         self.gamma = 0.98
-        self.tau = 0.001
+        self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 128
         self.frac_frames_train = 1.0
@@ -55,10 +55,8 @@ class Parameters:
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
         
-
         # hidden layer
         self.ls = 300
-
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -75,9 +73,7 @@ class Parameters:
         # ========================================== NeuroEvolution Params =============================================
 
         # Num of trials
-        if cla.env == 'Hopper-v2' or cla.env == 'Reacher-v2':
-            self.num_evals = 3
-        elif cla.env == 'Walker2d-v2':
+        if cla.env == 'Walker2d-v2':
             self.num_evals = 5
         else:
             self.num_evals = 3
@@ -86,7 +82,7 @@ class Parameters:
         self.elite_fraction = 0.2
  
         # Number of actors in the population
-        self.pop_size = 10
+        self.pop_size = 30
 
         # Mutation and crossover
         self.crossover_prob = 0.0
@@ -101,7 +97,7 @@ class Parameters:
         self.verbose_crossover = cla.verbose_crossover
 
         # Genetic memory size
-        self.individual_bs = 8000
+        self.individual_bs = 10_000
 
         # Variation operator statistics
         self.opstat = cla.opstat

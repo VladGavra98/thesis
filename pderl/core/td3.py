@@ -140,8 +140,9 @@ class TD3(object):
         # TODO: add dealyed udpate
         if iteration % self.args.policy_update_freq ==0:
             self.actor_optim.zero_grad()
-            est_q1, est_q2 = self.critic.forward(state_batch, self.actor.forward(state_batch))
-            policy_grad_loss = -(torch.min(est_q1, est_q2)).mean()   # add minus to make it a loss
+            # retrieve value of the first critic
+            est_q1, _ = self.critic.forward(state_batch, self.actor.forward(state_batch))
+            policy_grad_loss = -(est_q1).mean()   # add minus to make it a loss
             policy_loss = policy_grad_loss
 
             policy_loss.backward()
