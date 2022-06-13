@@ -25,14 +25,11 @@ class Parameters:
         if  cla.frames:
             self.num_frames = cla.frames
         else:
-            self.num_frames = 1000000
+            self.num_frames = 1_000_000
 
 
         # Synchronization
-        if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2'or 'lunar' in cla.env.lower():
-            self.rl_to_ea_synch_period = 1
-        else:
-            self.rl_to_ea_synch_period = 3
+        self.rl_to_ea_synch_period = 3
 
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
@@ -45,8 +42,9 @@ class Parameters:
         # Model save frequency if save is active
         self.next_save = cla.next_save
 
-        # ========================================== DDPG Params =============================================
-        self.use_ln = True
+        # ========================================== DDPG legacy Params =============================================
+        self.use_ddpg = cla.use_ddpg   # default should be False
+
         self.gamma = 0.98
         self.tau = 0.001
         self.seed = cla.seed
@@ -57,10 +55,10 @@ class Parameters:
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
         
-        if 'lunarlander' or 'car' in cla.env.lower():
-            self.ls = 300
-        else:
-            self.ls = 128
+
+        # hidden layer
+        self.ls = 300
+
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -69,6 +67,10 @@ class Parameters:
         self.beta_zero = 0.5
         self.learn_start = (1 + self.buffer_size / self.batch_size) * 2
         # self.total_steps = self.num_frames
+
+
+        # ========================================== TD3 Params =============================================
+        self.policy_update_freq = 2
 
         # ========================================== NeuroEvolution Params =============================================
 
@@ -81,13 +83,10 @@ class Parameters:
             self.num_evals = 3
 
         # Elitism Rate
-        if cla.env == 'Reacher-v2' or cla.env == 'Walker2d-v2' or cla.env == 'Ant-v2' or cla.env == 'Hopper-v2' or 'lunar' in cla.env.lower():
-            self.elite_fraction = 0.2
-        else:
-            self.elite_fraction = 0.1
-
+        self.elite_fraction = 0.2
+ 
         # Number of actors in the population
-        self.pop_size = 30
+        self.pop_size = 10
 
         # Mutation and crossover
         self.crossover_prob = 0.0
@@ -119,8 +118,8 @@ class Parameters:
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
 
-    def write_params(self, stdout=True):
-        """ Transfer parmaters obejct to dict. 
+    def write_params(self, stdout=True) -> dict:
+        """ Transfer parmaters obejct to a state dictionary. 
         Args:
             stdout (bool, optional): Print. Defaults to True.
 
@@ -130,7 +129,7 @@ class Parameters:
         params = pprint.pformat(vars(self), indent=4)
         if stdout:
             print(params)
+
         return self.__dict__
 
-        with open(os.path.join(self.save_foldername, 'info.txt'), 'w') as f:
-            f.write(params)
+  
