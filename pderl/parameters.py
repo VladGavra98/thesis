@@ -16,7 +16,6 @@ class Parameters:
         print('Current device:', self.device)
 
         # Render episodes
-        self.render = cla.render
         self.env_name = cla.env
         self.save_periodic = cla.save_periodic if cla.save_periodic else False
         
@@ -92,8 +91,8 @@ class Parameters:
         self.proximal_mut = cla.proximal_mut
         self.distil = cla.distil
         self.distil_type = cla.distil_type
-        self.verbose_mut = cla.verbose_mut
-        self.verbose_crossover = cla.verbose_crossover
+        self._verbose_mut = cla.verbose_mut
+        self._verbose_crossover = cla.verbose_crossover
 
         # Genetic memory size
         self.individual_bs = 10_000
@@ -106,14 +105,12 @@ class Parameters:
         # Save Results
         self.state_dim = None  # To be initialised externally
         self.action_dim = None  # To be initialised externally
-        if cla.logdir == None:
-            self.save_foldername = 'pderl/logs'
-        else:
-            self.save_foldername = cla.logdir
+        self.save_foldername = 'pderl/tmp_logs'
+ 
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
 
-    def write_params(self, stdout=True) -> dict:
+    def write_params(self, stdout=False) -> dict:
         """ Transfer parmaters obejct to a state dictionary. 
         Args:
             stdout (bool, optional): Print. Defaults to True.

@@ -233,7 +233,7 @@ if __name__ == "__main__":
     parameters.state_dim = wrapper.env.observation_space.shape[0]
     parameters.use_ln = True
     parameters.device = torch.device('cuda')
-    setattr(parameters, 'ls', 300)
+    # setattr(parameters, 'ls', 300)
 
     # Seed
     wrapper.env.seed(args.seed)

@@ -7,7 +7,7 @@ import wandb
 from envs.lunarlander import LunarLanderWrapper
 
 '''                           Globals                                                        '''
-num_games = 5000
+num_games = 10
 num_frames = num_games * 200
 
 # -store_true means that it becomes true if I mention the argument
@@ -32,7 +32,7 @@ parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float
 parser.add_argument('-mut_noise', help='Use a random mutation magnitude', action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover', help='Make crossovers verbose', action='store_true')
-parser.add_argument('-logdir', help='Folder where to save results', type=str, default = 'pderl/logs')
+# parser.add_argument('-logdir', help='Folder where to save results', type=str, default = '.wand/logs')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-opstat_freq', help='Frequency (in generations) to store operator statistics', type=int, default=1)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
@@ -57,7 +57,6 @@ def save_agents(parameters : object, elite_index : int = None):
     if elite_index is not None:
         torch.save(agent.pop[elite_index].actor.state_dict(), os.path.join(parameters.save_foldername,
                                                                                    'elite_net.pkl'))
-
     print("Progress Saved")
 
 if __name__ == "__main__":
@@ -72,12 +71,16 @@ if __name__ == "__main__":
     parameters.state_dim = env.observation_space.shape[0]
 
     # Write the parameters to a the info file and print them
-    params_dict = parameters.write_params(stdout=True)
+    params_dict = parameters.write_params()
 
     # strat trackers
-
-    wandb.init(project="pderl_td3", entity="vgavra", name = cla.run_name,\
-         config= params_dict)
+    run = wandb.init(project="pderl_phlab", 
+                entity="vgavra",
+                dir = '../logs',
+                name = cla.run_name,
+                config= params_dict)
+    parameters.save_foldername = str(run.dir)
+    wandb.config.update({"save_foldername": parameters.save_foldername,"run_name":run.name}, allow_val_change=True)
 
     # Seed
     env.seed(parameters.seed)
@@ -85,6 +88,8 @@ if __name__ == "__main__":
     np.random.seed(parameters.seed)
     random.seed(parameters.seed)
 
+    # Print run paramters for sanity cheks
+    parameters.write_params(stdout=True)
 
     # Create Agent
     agent = agent.Agent(parameters, wrapper)
@@ -128,6 +133,7 @@ if __name__ == "__main__":
     # Save final model:
     save_agents(parameters, elite_index)
 
+    run.finish()
             
 
 
