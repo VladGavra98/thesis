@@ -22,29 +22,17 @@ class Parameters:
         
 
         # Number of Frames to Run
-        if  cla.frames:
+        if cla.frames:
             self.num_frames = cla.frames
         else:
-            self.num_frames = 1000000
-        # if cla.env == 'Hopper-v2':
-        #     self.num_frames = 1500000
-        # elif cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2' or cla.env == 'HalfCheetah-v2':
-        #     self.num_frames = 3000000
-        # elif 'lunarlander' in cla.env.lower():
-        #     self.num_frames = 600000
-        # else:
-        #     self.num_frames = 500000
-        # # NOTE reduced number of total frames
+            self.num_frames = 1_000_000
 
         # Synchronization
-        if cla.env == 'Hopper-v2' or cla.env == 'Ant-v2' or cla.env == 'Walker2d-v2'or 'lunar' in cla.env.lower():
-            self.rl_to_ea_synch_period = 1
-        else:
-            self.rl_to_ea_synch_period = 3
-
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
             self.rl_to_ea_synch_period = cla.sync_period
+        else:
+            self.rl_to_ea_synch_period = 1
 
         # Novelty Search
         self.ns = cla.novelty
@@ -53,10 +41,11 @@ class Parameters:
         # Model save frequency if save is active
         self.next_save = cla.next_save
 
-        # ========================================== DDPG Params =============================================
-        self.use_ln = True
+        # ==================================  DDPG legacy Params =============================================
+        self.use_ddpg = cla.use_ddpg   # default should be False
+
         self.gamma = 0.98
-        self.tau = 0.001
+        self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 128
         self.frac_frames_train = 1.0
@@ -65,11 +54,8 @@ class Parameters:
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
         
-        if 'lunarlander' or 'car' in cla.env.lower():
-            self.ls = 300
-        else:
-            self.ls = 128
-        print(self.ls)
+        # hidden layer
+        self.ls = 128
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -79,22 +65,21 @@ class Parameters:
         self.learn_start = (1 + self.buffer_size / self.batch_size) * 2
         # self.total_steps = self.num_frames
 
-        # ========================================== NeuroEvolution Params =============================================
+        # ==================================    TD3 Params  =============================================
+        self.policy_update_freq = 2    # minimum for TD3
+        self.noise_clip         = 0.5  # default
+
+        # =================================   NeuroEvolution Params =============================================
 
         # Num of trials
-        if cla.env == 'Hopper-v2' or cla.env == 'Reacher-v2':
-            self.num_evals = 3
-        elif cla.env == 'Walker2d-v2':
+        if cla.env == 'Walker2d-v2':
             self.num_evals = 5
         else:
             self.num_evals = 3
 
         # Elitism Rate
-        if cla.env == 'Reacher-v2' or cla.env == 'Walker2d-v2' or cla.env == 'Ant-v2' or cla.env == 'Hopper-v2' or 'lunar' in cla.env.lower():
-            self.elite_fraction = 0.2
-        else:
-            self.elite_fraction = 0.1
-
+        self.elite_fraction = 0.2
+ 
         # Number of actors in the population
         self.pop_size = 30
 
@@ -111,7 +96,7 @@ class Parameters:
         self.verbose_crossover = cla.verbose_crossover
 
         # Genetic memory size
-        self.individual_bs = 8000
+        self.individual_bs = 10_000
 
         # Variation operator statistics
         self.opstat = cla.opstat
@@ -128,12 +113,18 @@ class Parameters:
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
 
-    def write_params(self, stdout=True):
-        # Dump all the hyper-parameters in a file.
+    def write_params(self, stdout=True) -> dict:
+        """ Transfer parmaters obejct to a state dictionary. 
+        Args:
+            stdout (bool, optional): Print. Defaults to True.
+
+        Returns:
+            dict: Parameters dict
+        """
         params = pprint.pformat(vars(self), indent=4)
         if stdout:
             print(params)
-        return params
 
-        with open(os.path.join(self.save_foldername, 'info.txt'), 'w') as f:
-            f.write(params)
+        return self.__dict__
+
+  

@@ -3,24 +3,33 @@ from core import mod_neuro_evo as utils_ne
 from core import mod_utils as utils
 from core import replay_memory
 from core import ddpg as ddpg
+from core import td3 as td3
 from scipy.spatial import distance
 from core import replay_memory
 from parameters import Parameters
+from pderl.core import genetic_agent, mod_utils
 
 
 
 class Agent:
-    def __init__(self, args: Parameters, env):
-        self.args = args; self.env = env
+    def __init__(self, args: Parameters, wrapper):
+        self.args = args; 
+        self.env = wrapper.env
 
         # Init population
         self.pop = []
         self.buffers = []
         for _ in range(args.pop_size):
-            self.pop.append(ddpg.GeneticAgent(args))
+            self.pop.append(genetic_agent.GeneticAgent(args))
 
-        # Init RL Agent
-        self.rl_agent = ddpg.DDPG(args)
+        # Define RL Agent
+        print('Anget type: ' + ('DDPG' if args.use_ddpg else 'TD3'))
+        if args.use_ddpg:
+            self.rl_agent = ddpg.DDPG(args)
+        else:
+            self.rl_agent = td3.TD3(args)
+
+        # Define Memory Buffer:
         if args.per:
             self.replay_buffer = replay_memory.PrioritizedReplayMemory(args.buffer_size, args.device,
                                                                        beta_frames=self.args.num_frames)
@@ -29,11 +38,11 @@ class Agent:
 
         # Define noise process:
         if args.use_ounoise:
-            print('Usign OU noise')
-            self.noise_process = ddpg.OUNoise(args.action_dim)
+            print('Using OU noise')
+            self.noise_process = mod_utils.OUNoise(args.action_dim)
         else:
             print('Using Gaussian noise')
-            self.noise_process = ddpg.GaussianNoise(args.action_dim, sd = args.noise_sd)
+            self.noise_process = mod_utils.GaussianNoise(args.action_dim, sd = args.noise_sd)
 
         # Initialise evolutionary loop
         self.evolver = utils_ne.SSNE(self.args, self.rl_agent.critic, self.evaluate)
@@ -50,15 +59,15 @@ class Agent:
 
         # Trackers
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
-    
+        self.rl_iteration = 0 # for TD3 delyed policy updates
 
-    def evaluate(self,agent: ddpg.GeneticAgent or ddpg.DDPG, is_render=False, is_action_noise=False,
-                 store_transition=True) -> tuple:
+    def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
+                is_action_noise=False,
+                 store_transition = True) -> tuple:
         """ Play one game to evaualute the agent.
 
         Args:
-            agent (ddpg.GeneticAgentorddpg.DDPG): Agent class. 
-            is_render (bool, optional): Show render. Defaults to False.
+            agent (GeneticAgentor): Agent class. 
             is_action_noise (bool, optional): Add OU noise to action. Defaults to False.
             store_transition (bool, optional): Add frames to memory buffer. Defaults to True.
 
@@ -66,19 +75,17 @@ class Agent:
             tuple: Reward, temporal difference error
         """
         total_reward = 0.0
-        total_error = 0.0
 
         state = self.env.reset()
         done = False
 
-        while not done:
+        while not done: 
             # play one 'game'
-            if self.args.render and is_render: 
-                self.env.render()
 
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:
-                action += self.noise_process.noise()
+                clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
+                action += clipped_noise
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
@@ -89,18 +96,18 @@ class Agent:
             if store_transition:
                 transition = (state, action, next_state, reward, float(done))
                 self.num_frames += 1; self.gen_frames += 1
-
                 self.replay_buffer.add(*transition)
                 agent.buffer.add(*transition)
+
             state = next_state
 
         # updated games if is done
         if store_transition: 
             self.num_games += 1
 
-        return {'reward': total_reward, 'td_error': total_error}
+        return {'reward': total_reward}
 
-    def rl_to_evo(self, rl_agent: ddpg.DDPG, evo_net: ddpg.GeneticAgent):
+    def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
             target_param.data.copy_(param.data)
         evo_net.buffer.reset()
@@ -121,52 +128,50 @@ class Agent:
                 novelties[i] += (net.get_novelty(batch))
         return novelties / epochs
 
-    def train_ddpg(self):
-        bcs_loss, pgs_loss = [], []
+    def train_rl(self):
+        """ Update the RL agent 
+        """
+        pgs_obj, TD_loss = [], []
         if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
             for _ in range(int(self.gen_frames * self.args.frac_frames_train)):
+                self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
-                pgl, delta = self.rl_agent.update_parameters(batch)
-                pgs_loss.append(pgl)
+                pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration)
+                if pgl is not None:
+                    pgs_obj.append(-pgl)
+                TD_loss.append(TD)
 
-        return {'bcs_loss': 0, 'pgs_loss': pgs_loss}
+        return {'PG_obj': pgs_obj, 'TD_loss': TD_loss}
 
     def train(self):
         self.gen_frames = 0
         self.iterations += 1
 
-        '''+++++++++++++++++++++++++++++++   EVOLUTION    +++++++++++++++++++++++++++++++++++++++++++'''
+        '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
         rewards = np.zeros(len(self.pop))
-        errors  = np.zeros(len(self.pop))
         # -loop over population AND store experiences
         for i, net in enumerate(self.pop):   
             for _ in range(self.args.num_evals):
-                episode = self.evaluate(net, is_render=False, is_action_noise=False)
+                episode = self.evaluate(net, is_action_noise=False)
                 rewards[i] += episode['reward']
-                errors[i] += episode['td_error']
 
         rewards /= self.args.num_evals
-        errors /= self.args.num_evals
-
-        # all_fitness = 0.8 * rankdata(rewards) + 0.2 * rankdata(errors)
         all_fitness = rewards
 
         # Validation test for NeuroEvolution 
-        # champion -- highest reward
-        #  population_avg -- avergae over the entire agent population
-        best_train_fitness = np.max(rewards)
-        population_avg = np.average(rewards)
+        best_train_fitness = np.max(rewards)  #  champion -- highest reward
+        worst_train_fitness = np.min(rewards)
+        population_avg = np.average(rewards)    #  population_avg -- average over the entire agent population
         champion = self.pop[np.argmax(rewards)]
 
-        # print("Best TD Error:", np.max(errors))
 
         # Evaluate the champion
         test_scores = []
         for _ in range(self.validation_tests):
             # do NOT  store these trials
-            episode = self.evaluate(champion, is_render=True, is_action_noise=False, store_transition=False)
+            episode = self.evaluate(champion, is_action_noise=False, store_transition=False)
             test_scores.append(episode['reward'])
         test_score = np.average(test_scores)
         test_sd = np.std(test_scores)
@@ -174,25 +179,28 @@ class Agent:
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, all_fitness)
 
-        ''' +++++++++++++++++++++++++++++++   DDPG    +++++++++++++++++++++++++++++++++++++++++++'''
+        ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3)    +++++++++++++++++++++++++++++++++++++++++++'''
         # Collect experience for training
         self.evaluate(self.rl_agent, is_action_noise=True)
 
-        losses = self.train_ddpg()
+        # Gradient update
+        losses = self.train_rl()
 
         # Validation test for RL agent
-        tests_ddpg = []
+        tests_rl = []
         for _ in range(self.validation_tests):
             # do NOT  store these trials
-            ddpg_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
-            tests_ddpg.append(ddpg_stats['reward'])
-        ddpg_reward = np.average(tests_ddpg)
-        ddpg_std = np.std(tests_ddpg)
+            rl_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
+            tests_rl.append(rl_stats['reward'])
+        rl_reward = np.average(tests_rl)
+        rl_std = np.std(tests_rl)
 
-        # Sync RL Agent to NE every few steps
+
+        ''' +++++++++++++++++++++++++++++++   Actor Injection   +++++++++++++++++++++++++++++++++++++++++++'''
         if self.iterations % self.args.rl_to_ea_synch_period == 0:
             # Replace any index different from the new elite
             replace_index = np.argmin(all_fitness)
+
             if replace_index == elite_index:
                 replace_index = (replace_index + 1) % len(self.pop)
 
@@ -209,16 +217,19 @@ class Agent:
             'test_score':  test_score,
             'test_sd':     test_sd,
             'pop_avg':     population_avg,
+            'pop_min':     worst_train_fitness,
             'elite_index': elite_index,
-            'ddpg_reward': ddpg_reward,
-            'ddpg_std':    ddpg_std,
-            'pg_loss':     np.mean(losses['pgs_loss']),
-            'bc_loss':     np.mean(losses['bcs_loss']),
+            'rl_reward':  rl_reward,
+            'rl_std':     rl_std,
+            'PG_obj':     np.mean(losses['PG_obj']),
+            'TD_loss':     np.mean(losses['TD_loss']),
             'pop_novelty': 0.,
         }
 
 
 class Agent_ddpg:
+    """  Pure RL agent using DDPG """
+    # TODO: change this later to include TD3 for comparison
     def __init__(self, args: Parameters, env):
         self.args = args; self.env = env
 
@@ -248,13 +259,12 @@ class Agent_ddpg:
         # Trackers
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
 
-    def evaluate(self,agent: ddpg.GeneticAgent or ddpg.DDPG, is_render=False, is_action_noise=False,
+    def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG, is_action_noise=False,
                  store_transition=True) -> tuple:
         """ Play one game to evaualute the agent.
 
         Args:
             agent (ddpg.GeneticAgentorddpg.DDPG): Agent class. 
-            is_render (bool, optional): Show render. Defaults to False.
             is_action_noise (bool, optional): Add OU noise to action. Defaults to False.
             store_transition (bool, optional): Add frames to memory buffer. Defaults to True.
 
@@ -269,8 +279,6 @@ class Agent_ddpg:
 
         while not done:
             # play one 'game'
-            if self.args.render and is_render: 
-                self.env.render()
 
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:

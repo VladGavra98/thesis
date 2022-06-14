@@ -1,9 +1,10 @@
 import numpy as np, os, time, random
 from core import mod_utils as utils, agent
-import gym, torch
+import torch
 import argparse
 from parameters import Parameters
 import wandb
+from envs.lunarlander import LunarLanderWrapper
 
 '''                           Globals                                                        '''
 num_games = 5000
@@ -13,7 +14,7 @@ num_frames = num_games * 200
 parser = argparse.ArgumentParser()
 parser.add_argument('-run_name', default = 'test', type = str)
 parser.add_argument('-env', help='Environment Choices: (Swimmer-v2) (LunarLanderContinuous-v2)', type=str, default = 'LunarLanderContinuous-v2')
-# parser.add_argument('-num_games', help = 'Number of complete games to play', default = num_games)
+parser.add_argument('-use_ddpg', help='Wether to use DDPG or TD3 for the RL part. Defaults to TD3', action = 'store_true', default=False)
 parser.add_argument('-frames', help = 'Number of frames to learn from', default = num_frames, type = int)
 #  QD equivalent of num_games: 50 000 games = 400 iters x 5 emitters x 25 batch_size
 parser.add_argument('-seed', help='Random seed to be used', type=int, default=7)
@@ -61,20 +62,22 @@ def save_agents(parameters : object, elite_index : int = None):
 
 if __name__ == "__main__":
     cla = parser.parse_args()
-
-    # strat trackers
-    wandb.init(project="pderl_lunarlander", entity="vgavra", name = cla.run_name)
     parameters = Parameters(cla)  # Inject the cla arguments in the parameters object
 
     # Create Env
-    env = utils.NormalizedActions(gym.make(parameters.env_name))
+    wrapper = LunarLanderWrapper()
+    env = wrapper.env
 
     parameters.action_dim = env.action_space.shape[0]
     parameters.state_dim = env.observation_space.shape[0]
 
     # Write the parameters to a the info file and print them
     params_dict = parameters.write_params(stdout=True)
-    wandb.config = params_dict
+
+    # strat trackers
+
+    wandb.init(project="pderl_td3", entity="vgavra", name = cla.run_name,\
+         config= params_dict)
 
     # Seed
     env.seed(parameters.seed)
@@ -84,7 +87,7 @@ if __name__ == "__main__":
 
 
     # Create Agent
-    agent = agent.Agent(parameters, env)
+    agent = agent.Agent(parameters, wrapper)
     print('Running', parameters.env_name, ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
     # Main training loop:
@@ -95,13 +98,16 @@ if __name__ == "__main__":
         stats = agent.train()
 
         print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
-              ' Train_Max:', '%.2f'%stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
-              ' Test_Max:','%.2f'%stats['test_score'] if stats['test_score'] is not None else None,
-              ' Test_SD:','%.2f'%stats['test_sd'] if stats['test_sd'] is not None else None,
-              ' Population_Avg:', '%.2f'%stats['pop_avg'] if stats['pop_avg'] is not None else None,
+              ' Train Max:', '%.2f'%stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
+              ' Test Max:','%.2f'%stats['test_score'] if stats['test_score'] is not None else None,
+              ' Test SD:','%.2f'%stats['test_sd'] if stats['test_sd'] is not None else None,
+              ' Population Avg:', '%.2f'%stats['pop_avg'],
+              ' Weakest :', '%.2f'%stats['pop_min'],
               '\n',
-              ' DDPG Reward:', '%.2f'%stats['ddpg_reward'],
-              ' PG Loss:', '%.4f' % stats['pg_loss'], '\n')
+              ' RL Reward:', '%.2f'%stats['rl_reward'],
+              ' PG Objective:', '%.4f' % stats['PG_obj'], 
+              ' TD Loss:', '%.4f' % stats['TD_loss'],
+              '\n')
 
 
         # Update loggers:
