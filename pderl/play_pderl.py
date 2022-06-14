@@ -31,11 +31,11 @@ plt.rcParams.update({'font.size': 12})
 
 # Global paths:
 wrapper = LunarLanderWrapper()
-model_path = PurePath('logs/logs_s1_e3_b5e04_PD/evo_nets.pkl')
-elite_path = PurePath('logs/logs_s1_e3_b5e04_PD/elite_net.pkl')
-ddpg_path = PurePath('logs/logs_ddpg/ddpg_net.pkl')
+model_path = PurePath('logs/logs_TD3test/evo_nets.pkl')
+elite_path = PurePath('logs/logs_TD3test/elite_net.pkl')
 
-def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
+
+def evaluate(agent, wrapper, trials: int = 10, render: bool = False, kwargs : dict = None):
     """ Evaluate performance statistics of one individual over nubmer of trails/games.
 
     Args:
@@ -50,10 +50,10 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict =
     rewards, bcs = [], []
 
     for _ in range(trials):
-        total_reward, impact_x_pos, impact_y_vel = env.simualte(agent, render, **kwargs)
+        episode_dict = wrapper.simulate(agent, render, **kwargs)
 
-        rewards.append(total_reward)
-        bcs.append((impact_x_pos, impact_y_vel))
+        rewards.append(episode_dict['total_reward'])
+        bcs.append(episode_dict['bcs'])
 
     bcs = np.asarray(bcs)
     return np.average(rewards), np.std(rewards), np.average(bcs, axis=0)
@@ -154,15 +154,15 @@ def _extract_case(case : str, plotfolder : Path = PurePath('Results')) -> tuple:
     return extra_args, plotname, filename
 
 
-def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : bool = False):
+def gen_comparative_map(parameters, wrapper, num_trials : int, case : str, save_figure : bool = False):
     # NOTE needs refractoring
     # generate a comparative map based o nthe case
     extra_args, plotname,filename = _extract_case('nominal')  
 
-    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    agents_pop = load_genetic_agent(parameters, str(model_path), str(elite_path))
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env.simulate,
+        r_mean, r_std, bcs = evaluate(agent.actor, wrapper,
                 render=args.render, trials=num_trials,\
                      kwargs = extra_args)
         rewards.append(r_mean)
@@ -172,10 +172,10 @@ def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : 
     bcs_map_old = np.asarray(bcs_map)
 
     extra_args, plotname, filename = _extract_case(case)  
-    agents_pop = load_genetic_agent(parameters, model_path, elite_path)
+    agents_pop = load_genetic_agent(parameters, str(model_path), str(elite_path))
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env.simulate,
+        r_mean, r_std, bcs = evaluate(agent.actor, wrapper,
                 render=args.render, trials=num_trials,\
                      kwargs = extra_args)
         rewards.append(r_mean)
@@ -226,8 +226,6 @@ def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : 
 
 if __name__ == "__main__":
 
-    print(wrapper.env.__dict__)
-
     # Set parameters:
     parameters = Parameters(args, init=False)
     parameters.individual_bs = 0
@@ -244,11 +242,11 @@ if __name__ == "__main__":
     random.seed(args.seed)
 
     # Evaluation params:
-    num_trials = 10
+    num_trials = 2
+    evaluate_elite = True
+    evaluate_rl = False
     case = 'broken_compare'
     save_figure = False
-    evaluate_rl = False
-    evaluate_elite = False
 
 
     # ------------------------------------------------------------------------
@@ -257,8 +255,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------
     if evaluate_elite:
         extra_args, plotname,filename = _extract_case(case)    
-        elite_agent = load_rl_agent(parameters, elite_path)
-        reward_mean, reward_std, bcs = evaluate(elite_agent.actor, wrapper.env,
+        elite_agent = load_rl_agent(parameters, str(elite_path))
+        reward_mean, reward_std, bcs = evaluate(elite_agent.actor, wrapper,
                     render=args.render, trials=num_trials, kwargs = extra_args)
 
         print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
@@ -270,14 +268,14 @@ if __name__ == "__main__":
 
     if 'comp' in case.lower():
         # comparative plot  to the nominal case (with arrows) 
-        bcs_map, rewards = gen_comparative_map(parameters, num_trials, case, save_figure=save_figure)
+        bcs_map, rewards = gen_comparative_map(parameters, wrapper, num_trials, case, save_figure=save_figure)
     else:
         # simpel plot
         extra_args, plotname,filename = _extract_case(case)  
         agents_pop = load_genetic_agent(parameters, model_path, elite_path)
         rewards, bcs_map, rewards_std = [], [], []
         for agent in tqdm(agents_pop):  # evaluate each member for # trials
-            r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env,
+            r_mean, r_std, bcs = evaluate(agent.actor, wrapper,
                     render=args.render, trials=num_trials,\
                         kwargs = extra_args)
             rewards.append(r_mean)
@@ -300,7 +298,7 @@ if __name__ == "__main__":
     if evaluate_rl:
         setattr(parameters, 'ls', 32)
         rl_agent = load_rl_agent(parameters, ddpg_path)
-        reward_mean, reward_std, bcs = evaluate(rl_agent.actor, wrapper.env,
+        reward_mean, reward_std, bcs = evaluate(rl_agent.actor, wrapper,
                     render=args.render, trials=num_trials,\
                     kwargs = extra_args)
 
