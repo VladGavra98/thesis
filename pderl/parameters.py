@@ -27,13 +27,12 @@ class Parameters:
         else:
             self.num_frames = 1_000_000
 
-
         # Synchronization
-        self.rl_to_ea_synch_period = 3
-
         # Overwrite sync from command line if value is passed
         if cla.sync_period is not None:
             self.rl_to_ea_synch_period = cla.sync_period
+        else:
+            self.rl_to_ea_synch_period = 1
 
         # Novelty Search
         self.ns = cla.novelty
@@ -42,7 +41,7 @@ class Parameters:
         # Model save frequency if save is active
         self.next_save = cla.next_save
 
-        # ========================================== DDPG legacy Params =============================================
+        # ==================================  DDPG legacy Params =============================================
         self.use_ddpg = cla.use_ddpg   # default should be False
 
         self.gamma = 0.98
@@ -56,7 +55,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
         
         # hidden layer
-        self.ls = 300
+        self.ls = 128
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -66,11 +65,11 @@ class Parameters:
         self.learn_start = (1 + self.buffer_size / self.batch_size) * 2
         # self.total_steps = self.num_frames
 
+        # ==================================    TD3 Params  =============================================
+        self.policy_update_freq = 2    # minimum for TD3
+        self.noise_clip         = 0.5  # default
 
-        # ========================================== TD3 Params =============================================
-        self.policy_update_freq = 2
-
-        # ========================================== NeuroEvolution Params =============================================
+        # =================================   NeuroEvolution Params =============================================
 
         # Num of trials
         if cla.env == 'Walker2d-v2':

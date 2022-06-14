@@ -1,9 +1,10 @@
 import numpy as np, os, time, random
 from core import mod_utils as utils, agent
-import gym, torch
+import torch
 import argparse
 from parameters import Parameters
 import wandb
+from envs.lunarlander import LunarLanderWrapper
 
 '''                           Globals                                                        '''
 num_games = 5000
@@ -64,7 +65,8 @@ if __name__ == "__main__":
     parameters = Parameters(cla)  # Inject the cla arguments in the parameters object
 
     # Create Env
-    env = utils.NormalizedActions(gym.make(parameters.env_name))
+    wrapper = LunarLanderWrapper()
+    env = wrapper.env
 
     parameters.action_dim = env.action_space.shape[0]
     parameters.state_dim = env.observation_space.shape[0]
@@ -85,7 +87,7 @@ if __name__ == "__main__":
 
 
     # Create Agent
-    agent = agent.Agent(parameters, env)
+    agent = agent.Agent(parameters, wrapper)
     print('Running', parameters.env_name, ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
     # Main training loop:

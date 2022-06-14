@@ -4,7 +4,6 @@ import random, pickle
 import numpy as np
 import torch
 import os
-import gym
 import torch.nn as nn
 
 class Tracker:
@@ -137,19 +136,7 @@ class SumTree:
         return (idx, self.tree[idx], self.data[dataIdx])
 
 
-class NormalizedActions(gym.ActionWrapper):
-    """ Wrapper class to resclae the gym env actions.
-        from [-1, 1] => [0, 1]
 
-    Args:
-        gym (module): Gym environment
-    """
-    def action(self, action):
-        action = (action + 1) / 2  # [-1, 1] => [0, 1]
-        action *= (self.action_space.high - self.action_space.low)
-        action += self.action_space.low
-        return action
-    
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                                             # Update Fucntions

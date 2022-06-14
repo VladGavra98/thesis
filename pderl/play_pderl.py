@@ -2,17 +2,15 @@ import numpy as np
 import os
 import random
 from parameters import Parameters
-from core import mod_utils as utils
-from core.ddpg import GeneticAgent
+from core.genetic_agent import GeneticAgent
 import torch
-import gym
 import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pathlib import Path, PurePath
 
 # my envs
-from envs.lunarlander import simulate
+from envs.lunarlander import LunarLanderWrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-env', help='Environment Choice',
@@ -21,7 +19,7 @@ parser.add_argument('-seed', help='Random seed to be used',
                     type=int, default=7)
 parser.add_argument('-render', help='Render gym episodes',
                     action='store_true', default=False)
-parser.add_argument('-load_champion', help='Loads the best performingactor',
+parser.add_argument('-load_champion', help='Loads the best-performing actor',
                     action='store_true', default=False)
 args = parser.parse_args()
 
@@ -32,17 +30,17 @@ plt.rcParams.update({'font.size': 12})
 
 
 # Global paths:
-env = utils.NormalizedActions(gym.make('LunarLanderContinuous-v2'))
+wrapper = LunarLanderWrapper()
 model_path = PurePath('logs/logs_s1_e3_b5e04_PD/evo_nets.pkl')
 elite_path = PurePath('logs/logs_s1_e3_b5e04_PD/elite_net.pkl')
 ddpg_path = PurePath('logs/logs_ddpg/ddpg_net.pkl')
 
 def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict = None):
-    """ Evaualte an individual for a couple of trails/games.
+    """ Evaluate performance statistics of one individual over nubmer of trails/games.
 
     Args:
         agent (_type_): Actor to evalaute.
-        env (_type_): Environment for testing. Should be the same API as gym environments.
+        simualtee_func (executable): 
         trials (int, optional): Number of evaluation runs. Defaults to 10.
         render (bool, optional): Show policy in a video. Defaults to False.
 
@@ -52,7 +50,7 @@ def evaluate(agent, env, trials: int = 10, render: bool = False, kwargs : dict =
     rewards, bcs = [], []
 
     for _ in range(trials):
-        total_reward, impact_x_pos, impact_y_vel = simulate(agent, env, render, **kwargs)
+        total_reward, impact_x_pos, impact_y_vel = env.simualte(agent, render, **kwargs)
 
         rewards.append(total_reward)
         bcs.append((impact_x_pos, impact_y_vel))
@@ -157,14 +155,14 @@ def _extract_case(case : str, plotfolder : Path = PurePath('Results')) -> tuple:
 
 
 def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : bool = False):
-
+    # NOTE needs refractoring
     # generate a comparative map based o nthe case
     extra_args, plotname,filename = _extract_case('nominal')  
 
     agents_pop = load_genetic_agent(parameters, model_path, elite_path)
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent.actor, env,
+        r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env.simulate,
                 render=args.render, trials=num_trials,\
                      kwargs = extra_args)
         rewards.append(r_mean)
@@ -177,7 +175,7 @@ def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : 
     agents_pop = load_genetic_agent(parameters, model_path, elite_path)
     rewards, bcs_map, rewards_std = [], [], []
     for agent in tqdm(agents_pop):  # evaluate each member for # trials
-        r_mean, r_std, bcs = evaluate(agent.actor, env,
+        r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env.simulate,
                 render=args.render, trials=num_trials,\
                      kwargs = extra_args)
         rewards.append(r_mean)
@@ -228,17 +226,19 @@ def gen_comparative_map(parameters, num_trials : int, case : str, save_figure : 
 
 if __name__ == "__main__":
 
+    print(wrapper.env.__dict__)
+
     # Set parameters:
     parameters = Parameters(args, init=False)
     parameters.individual_bs = 0
-    parameters.action_dim = env.action_space.shape[0]
-    parameters.state_dim = env.observation_space.shape[0]
+    parameters.action_dim = wrapper.env.action_space.shape[0]
+    parameters.state_dim = wrapper.env.observation_space.shape[0]
     parameters.use_ln = True
     parameters.device = torch.device('cuda')
     setattr(parameters, 'ls', 300)
 
     # Seed
-    env.seed(args.seed)
+    wrapper.env.seed(args.seed)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     if evaluate_elite:
         extra_args, plotname,filename = _extract_case(case)    
         elite_agent = load_rl_agent(parameters, elite_path)
-        reward_mean, reward_std, bcs = evaluate(elite_agent.actor, env,
+        reward_mean, reward_std, bcs = evaluate(elite_agent.actor, wrapper.env,
                     render=args.render, trials=num_trials, kwargs = extra_args)
 
         print(f'Elite:{reward_mean:.2f}, with SD = {reward_std:.2f}\n')
@@ -277,7 +277,7 @@ if __name__ == "__main__":
         agents_pop = load_genetic_agent(parameters, model_path, elite_path)
         rewards, bcs_map, rewards_std = [], [], []
         for agent in tqdm(agents_pop):  # evaluate each member for # trials
-            r_mean, r_std, bcs = evaluate(agent.actor, env,
+            r_mean, r_std, bcs = evaluate(agent.actor, wrapper.env,
                     render=args.render, trials=num_trials,\
                         kwargs = extra_args)
             rewards.append(r_mean)
@@ -300,7 +300,7 @@ if __name__ == "__main__":
     if evaluate_rl:
         setattr(parameters, 'ls', 32)
         rl_agent = load_rl_agent(parameters, ddpg_path)
-        reward_mean, reward_std, bcs = evaluate(rl_agent.actor, env,
+        reward_mean, reward_std, bcs = evaluate(rl_agent.actor, wrapper.env,
                     render=args.render, trials=num_trials,\
                     kwargs = extra_args)
 

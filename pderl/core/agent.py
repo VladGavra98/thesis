@@ -12,8 +12,9 @@ from pderl.core import genetic_agent, mod_utils
 
 
 class Agent:
-    def __init__(self, args: Parameters, env):
-        self.args = args; self.env = env
+    def __init__(self, args: Parameters, wrapper):
+        self.args = args; 
+        self.env = wrapper.env
 
         # Init population
         self.pop = []
@@ -21,12 +22,14 @@ class Agent:
         for _ in range(args.pop_size):
             self.pop.append(genetic_agent.GeneticAgent(args))
 
-        # Init RL Agent
+        # Define RL Agent
         print('Anget type: ' + ('DDPG' if args.use_ddpg else 'TD3'))
         if args.use_ddpg:
             self.rl_agent = ddpg.DDPG(args)
         else:
             self.rl_agent = td3.TD3(args)
+
+        # Define Memory Buffer:
         if args.per:
             self.replay_buffer = replay_memory.PrioritizedReplayMemory(args.buffer_size, args.device,
                                                                        beta_frames=self.args.num_frames)
@@ -58,7 +61,8 @@ class Agent:
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
         self.rl_iteration = 0 # for TD3 delyed policy updates
 
-    def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, is_action_noise=False,
+    def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
+                is_action_noise=False,
                  store_transition = True) -> tuple:
         """ Play one game to evaualute the agent.
 
@@ -80,7 +84,8 @@ class Agent:
 
             action = agent.actor.select_action(np.array(state))
             if is_action_noise:
-                action += self.noise_process.noise()
+                clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
+                action += clipped_noise
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
@@ -91,9 +96,9 @@ class Agent:
             if store_transition:
                 transition = (state, action, next_state, reward, float(done))
                 self.num_frames += 1; self.gen_frames += 1
-
                 self.replay_buffer.add(*transition)
                 agent.buffer.add(*transition)
+
             state = next_state
 
         # updated games if is done
