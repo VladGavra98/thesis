@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from typing import List
+from typing import List, Tuple, Dict
 import fastrand, math
 import torch
 import torch.distributions as dist
@@ -44,83 +44,7 @@ class SSNE:
 
         return weight
 
-    def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
-        # Evaluate the parents
-        trials = 5
-        if self.args.opstat and self.stats.should_log():
-            test_score_p1 = 0
-            for _ in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode['reward']
-            test_score_p1 /= trials
-
-            test_score_p2 = 0
-            for _ in range(trials):
-                episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode['reward']
-            test_score_p2 /= trials
-
-        for param1, param2 in zip(gene1.actor.parameters(), gene2.actor.parameters()):
-            # References to the variable tensors
-            W1 = param1.data
-            W2 = param2.data
-
-            if len(W1.shape) == 2: #Weights no bias
-                num_variables = W1.shape[0]
-                # Crossover opertation [Indexed by row]
-                num_cross_overs = fastrand.pcg32bounded(num_variables * 2)  # Lower bounded on full swaps
-                for i in range(num_cross_overs):
-                    receiver_choice = random.random()  # Choose which gene to receive the perturbation
-                    if receiver_choice < 0.5:
-                        ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
-                        W1[ind_cr, :] = W2[ind_cr, :]
-                    else:
-                        ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
-                        W2[ind_cr, :] = W1[ind_cr, :]
-
-            elif len(W1.shape) == 1: #Bias
-                num_variables = W1.shape[0]
-                # Crossover opertation [Indexed by row]
-                num_cross_overs = fastrand.pcg32bounded(num_variables)  # Lower bounded on full swaps
-                for i in range(num_cross_overs):
-                    receiver_choice = random.random()  # Choose which gene to receive the perturbation
-                    if receiver_choice < 0.5:
-                        ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
-                        W1[ind_cr] = W2[ind_cr]
-                    else:
-                        ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
-                        W2[ind_cr] = W1[ind_cr]
-
-        # Evaluate the children
-        if self.args.opstat and self.stats.should_log():
-            test_score_c1 = 0
-            for _ in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c1 += episode['reward']
-            test_score_c1 /= trials
-
-            test_score_c2 = 0
-            for _ in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c2 += episode['reward']
-            test_score_c2 /= trials
-
-            if self.args.verbose_crossover:
-                print("==================== Classic Crossover ======================")
-                print("Parent 1", test_score_p1)
-                print("Parent 2", test_score_p2)
-                print("Child 1", test_score_c1)
-                print("Child 2", test_score_c2)
-
-            self.stats.add({
-                'cros_parent1_fit': test_score_p1,
-                'cros_parent2_fit': test_score_p2,
-                'cros_child_fit': np.mean([test_score_c1, test_score_c2]),
-                'cros_child1_fit': test_score_c1,
-                'cros_child2_fit': test_score_c2,
-            })
-    
-    def distilation_crossover(self, gene1: GeneticAgent, gene2: GeneticAgent):
+    def distilation_crossover(self, gene1: GeneticAgent, gene2: GeneticAgent) -> GeneticAgent:
         new_agent = GeneticAgent(self.args)
         new_agent.buffer.add_latest_from(gene1.buffer, self.args.individual_bs // 2)
         new_agent.buffer.add_latest_from(gene2.buffer, self.args.individual_bs // 2)
@@ -354,8 +278,10 @@ class SSNE:
                 groups.append((second, first, SSNE.get_distance(pop[first], pop[second])))
         return sorted(groups, key=lambda group: group[2], reverse=True)
 
-    def epoch(self, pop: List[GeneticAgent], fitness_evals):
-        # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
+    def epoch(self, pop: List[GeneticAgent], fitness_evals : np.array | List[float]):
+        """ Entire epoch is handled with indices; 
+            Index ranks  nets by fitness evaluation - 0 is the best after reversing.
+        """ 
         index_rank = np.argsort(fitness_evals)[::-1]
         elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard
 
@@ -387,27 +313,18 @@ class SSNE:
             self.clone(master=pop[i], replacee=pop[replacee])
 
         # Crossover between elite and offsprings for the unselected genes with 100 percent probability
-        if self.args.distil:
-            if 'fitness' in self.args.distil_type.lower():
-                sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
-            elif 'dist' in self.args.distil_type.lower():
-                sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
-            else:
-                raise NotImplementedError('Unknown distilation type')
-            for i, unselected in enumerate(unselects):
-                first, second, _ = sorted_groups[i % len(sorted_groups)]
-                if fitness_evals[first] < fitness_evals[second]:
-                    first, second = second, first
-                self.clone(self.distilation_crossover(pop[first], pop[second]), pop[unselected])
+        if 'fitness' in self.args.distil_type.lower():
+            sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
+        elif 'dist' in self.args.distil_type.lower():
+            sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
         else:
-            if len(unselects) % 2 != 0:  # Number of unselects left should be even
-                unselects.append(unselects[fastrand.pcg32bounded(len(unselects))])
-            for i, j in zip(unselects[0::2], unselects[1::2]):
-                off_i = random.choice(new_elitists)
-                off_j = random.choice(offsprings)
-                self.clone(master=pop[off_i], replacee=pop[i])
-                self.clone(master=pop[off_j], replacee=pop[j])
-                self.crossover_inplace(pop[i], pop[j])
+            raise NotImplementedError('Unknown distilation type')
+        for i, unselected in enumerate(unselects):
+            first, second, _ = sorted_groups[i % len(sorted_groups)]
+            if fitness_evals[first] < fitness_evals[second]:
+                first, second = second, first
+            self.clone(self.distilation_crossover(pop[first], pop[second]), pop[unselected])
+
 
         # Crossover for selected offsprings
         if self.args.crossover_prob > 0.01:

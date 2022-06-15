@@ -133,11 +133,12 @@ class Agent:
         """
         pgs_obj, TD_loss = [], []
         if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
-            for _ in range(int(self.gen_frames * self.args.frac_frames_train)):
+            for _ in range(int(self.gen_frames)):
                 self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
                 pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration)
+
                 if pgl is not None:
                     pgs_obj.append(-pgl)
                 TD_loss.append(TD)
@@ -149,35 +150,35 @@ class Agent:
         self.iterations += 1
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++++'''
+        rewards     = np.zeros(len(self.pop))
+        test_scores = np.zeros(self.validation_tests)
+        tests_rl    = np.zeros(self.validation_tests)
+
         # Evaluate genomes/individuals
-        rewards = np.zeros(len(self.pop))
         # -loop over population AND store experiences
         for i, net in enumerate(self.pop):   
             for _ in range(self.args.num_evals):
                 episode = self.evaluate(net, is_action_noise=False)
                 rewards[i] += episode['reward']
-
         rewards /= self.args.num_evals
-        all_fitness = rewards
+  
 
         # Validation test for NeuroEvolution 
-        best_train_fitness = np.max(rewards)  #  champion -- highest reward
+        best_train_fitness  = np.max(rewards)  #  champion -- highest reward
         worst_train_fitness = np.min(rewards)
-        population_avg = np.average(rewards)    #  population_avg -- average over the entire agent population
-        champion = self.pop[np.argmax(rewards)]
+        population_avg      = np.average(rewards)    #  population_avg -- average over the entire agent population
+        champion            = self.pop[np.argmax(rewards)]
 
 
         # Evaluate the champion
-        test_scores = []
-        for _ in range(self.validation_tests):
+        for i in range(self.validation_tests):
             # do NOT  store these trials
             episode = self.evaluate(champion, is_action_noise=False, store_transition=False)
-            test_scores.append(episode['reward'])
-        test_score = np.average(test_scores)
-        test_sd = np.std(test_scores)
+            test_scores[i] = episode['reward']
+        test_score = np.average(test_scores); test_sd = np.std(test_scores)
 
         # NeuroEvolution's probabilistic selection and recombination step
-        elite_index = self.evolver.epoch(self.pop, all_fitness)
+        elite_index = self.evolver.epoch(self.pop, rewards)
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3)    +++++++++++++++++++++++++++++++++++++++++++'''
         # Collect experience for training
@@ -187,19 +188,16 @@ class Agent:
         losses = self.train_rl()
 
         # Validation test for RL agent
-        tests_rl = []
         for _ in range(self.validation_tests):
-            # do NOT  store these trials
-            rl_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)
-            tests_rl.append(rl_stats['reward'])
-        rl_reward = np.average(tests_rl)
-        rl_std = np.std(tests_rl)
+            rl_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)   # do NOT  store these trials
+            tests_rl[i]= rl_stats['reward']
+        rl_reward = np.average(tests_rl); rl_std = np.std(tests_rl)
 
 
         ''' +++++++++++++++++++++++++++++++   Actor Injection   +++++++++++++++++++++++++++++++++++++++++++'''
         if self.iterations % self.args.rl_to_ea_synch_period == 0:
             # Replace any index different from the new elite
-            replace_index = np.argmin(all_fitness)
+            replace_index = np.argmin(rewards)
 
             if replace_index == elite_index:
                 replace_index = (replace_index + 1) % len(self.pop)
@@ -307,7 +305,7 @@ class Agent_ddpg:
     def train_ddpg(self):
         bcs_loss, pgs_loss = [], []
         if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
-            for _ in range(int(self.gen_frames * self.args.frac_frames_train)):
+            for _ in range(int(self.gen_frames)):
                 
                 batch = self.replay_buffer.sample(self.args.batch_size)
                 pgl, delta = self.rl_agent.update_parameters(batch)
