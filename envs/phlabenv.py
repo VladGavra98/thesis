@@ -223,7 +223,7 @@ class CitationEnv(BaseEnv):
 class Actor():
     # NOTE for testing the environment implementation
     def __init__(self,state_dim, action_dim):
-        # random linear policy
+        # random linear policy 
         self.policy = np.random.rand(action_dim, state_dim,)
 
     def select_action(self,state):
