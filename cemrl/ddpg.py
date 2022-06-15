@@ -2,7 +2,6 @@ import numpy as np
 import sys
 import torch
 import torch.nn as nn
-import torch.multiprocessing as mp
 from tqdm import tqdm
 
 from models import Actor, Critic

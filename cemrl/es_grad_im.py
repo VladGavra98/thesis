@@ -3,9 +3,7 @@ import argparse
 
 import torch
 import torch.nn as nn
-import torch.multiprocessing as mp
 import torch.nn.functional as F
-import cma
 import pandas as pd
 
 import gym
@@ -21,6 +19,7 @@ from memory import Memory, Archive
 from samplers import IMSampler
 from util import *
 
+import wandb
 
 Sample = namedtuple('Sample', ('params', 'score',
                                'gens', 'start_pos', 'end_pos', 'steps'))
@@ -86,7 +85,7 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
 
         scores.append(score)
 
-    return np.mean(scores), steps
+    return np.mean(scores), np.std(scores), steps
 
 
 class Actor(RLNN):
@@ -303,7 +302,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', default='train', type=str,)
-    parser.add_argument('--env', default='HalfCheetah-v2', type=str)
+    parser.add_argument('--env', default='LunarLanderContinuous-v2', type=str)
     parser.add_argument('--start_steps', default=10000, type=int)
 
     # DDPG parameters
@@ -316,7 +315,7 @@ if __name__ == "__main__":
     parser.add_argument('--layer_norm', dest='layer_norm', action='store_true')
 
     # TD3 parameters
-    parser.add_argument('--use_td3', dest='use_td3', action='store_true')
+    parser.add_argument('--use_td3', dest='use_td3', default= True, action='store_true')
     parser.add_argument('--policy_noise', default=0.2, type=float)
     parser.add_argument('--noise_clip', default=0.5, type=float)
     parser.add_argument('--policy_freq', default=2, type=int)
@@ -331,7 +330,7 @@ if __name__ == "__main__":
     parser.add_argument('--ou_mu', default=0.0, type=float)
 
     # ES parameters
-    parser.add_argument('--pop_size', default=10, type=int)
+    parser.add_argument('--pop_size', default=30, type=int)
     parser.add_argument('--elitism', dest="elitism",  action='store_true')
     parser.add_argument('--n_grad', default=5, type=int)
     parser.add_argument('--sigma_init', default=1e-3, type=float)
@@ -346,8 +345,8 @@ if __name__ == "__main__":
 
     # Training parameters
     parser.add_argument('--n_episodes', default=1, type=int)
-    parser.add_argument('--max_steps', default=1000000, type=int)
-    parser.add_argument('--mem_size', default=1000000, type=int)
+    parser.add_argument('--max_steps', default=800_000, type=int)
+    parser.add_argument('--mem_size', default=1_000_000, type=int)
     parser.add_argument('--n_noisy', default=0, type=int)
 
     # Testing parameters
@@ -355,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_test', default=1, type=int)
 
     # misc
-    parser.add_argument('--output', default='results/', type=str)
+    # parser.add_argument('--output', default='results/', type=str)
     parser.add_argument('--period', default=5000, type=int)
     parser.add_argument('--n_eval', default=10, type=int)
     parser.add_argument('--save_all_models',
@@ -365,10 +364,7 @@ if __name__ == "__main__":
     parser.add_argument('--render', dest='render', action='store_true')
 
     args = parser.parse_args()
-    args.output = get_output_folder(args.output, args.env)
-    with open(args.output + "/parameters.txt", 'w') as file:
-        for key, value in vars(args).items():
-            file.write("{} = {}\n".format(key, value))
+
 
     # environment
     env = gym.make(args.env)
@@ -376,6 +372,20 @@ if __name__ == "__main__":
     action_dim = env.action_space.shape[0]
     max_action = int(env.action_space.high[0])
 
+    # strat trackers
+    run = wandb.init(project="try_cemrl", 
+                entity="vgavra",
+                dir = '../logs',
+                name = 'test1_with_imp_sampling',
+                config= args.__dict__)
+
+    args.output = get_output_folder(str(run.dir), args.env)
+    with open(args.output + "/parameters.txt", 'w') as file:
+        for key, value in vars(args).items():
+            file.write("{} = {}\n".format(key, value))
+            
+    wandb.config.update({"output_folder": args.output,"run_name":run.name}, allow_val_change=True)
+    
     # memory
     memory = Memory(args.mem_size, state_dim, action_dim)
 
@@ -430,6 +440,7 @@ if __name__ == "__main__":
     while total_steps < args.max_steps:
 
         fitness = np.zeros(args.pop_size)
+        std_pop = np.zeros(args.pop_size)
         n_start = np.zeros(args.pop_size)
         n_steps = np.zeros(args.pop_size)
         es_params, n_r, idx_r = sampler.ask(args.pop_size, old_es_params)
@@ -447,11 +458,12 @@ if __name__ == "__main__":
                     actor.parameters(), lr=args.actor_lr)
 
                 # critic update
-                for _ in tqdm(range((actor_steps + reused_steps) // args.n_grad)):
+                print('Update critic and actors ...')
+                for _ in range(int((actor_steps + reused_steps) / args.n_grad)):
                     critic.update(memory, args.batch_size, actor, critic_t)
 
                 # actor update
-                for _ in tqdm(range(actor_steps + reused_steps)):
+                for _ in range(int(actor_steps + reused_steps)):
                     actor.update(memory, args.batch_size,
                                  critic, actor_t)
 
@@ -464,7 +476,7 @@ if __name__ == "__main__":
         # evaluate noisy actor(s)
         for i in range(args.n_noisy):
             actor.set_params(es_params[i])
-            f, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
+            f, std, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
                                 render=args.render, noise=a_noise)
             actor_steps += steps
             prCyan('Noisy actor {} fitness:{}'.format(i, f))
@@ -477,12 +489,13 @@ if __name__ == "__main__":
 
                 actor.set_params(es_params[i])
                 pos = memory.get_pos()
-                f, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
+                f, std, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
                                     render=args.render)
                 actor_steps += steps
 
                 # updating arrays
                 fitness[i] = f
+                std_pop[i] = std
                 n_steps[i] = steps
                 n_start[i] = pos
 
@@ -507,6 +520,7 @@ if __name__ == "__main__":
                 prGreen('Actor {}, fitness:{}'.format(
                     i, fitness[i]))
 
+
         # update ea
         es.tell(es_params, fitness)
 
@@ -520,13 +534,19 @@ if __name__ == "__main__":
         old_n_start = deepcopy(n_start)
         old_es_params = deepcopy(es_params)
 
+        # update logers
+        stats = {'popuation_avg': np.mean(fitness),
+         'champion_score': np.max(fitness), 'champion_std': std_pop[np.argmas(fitness)],
+         'min': np.min(fitness),
+         'frames':n_steps}
+        wandb.log(stats)
+
         # save stuff
         if step_cpt >= args.period:
-
             # evaluate mean actor over several runs. Memory is not filled
             # and steps are not counted
             actor.set_params(es.mu)
-            f_mu, _ = evaluate(actor, env, memory=None, n_episodes=args.n_eval,
+            f_mu,std_mu, _ = evaluate(actor, env, memory=None, n_episodes=args.n_eval,
                                render=args.render)
             prRed('Actor Mu Average Fitness:{}'.format(f_mu))
 
@@ -554,6 +574,8 @@ if __name__ == "__main__":
                 actor.save_model(args.output, "actor")
             df = df.append(res, ignore_index=True)
             step_cpt = 0
-            print(res)
+
 
         print("Total steps", total_steps)
+    
+    run.finish()

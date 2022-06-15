@@ -14,6 +14,8 @@ from random_process import *
 from util import *
 from memory import Memory, SharedMemory
 
+import wandb
+
 USE_CUDA = torch.cuda.is_available()
 if USE_CUDA:
     FloatTensor = torch.cuda.FloatTensor
@@ -147,7 +149,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', default='train', type=str,)
-    parser.add_argument('--env', default='HalfCheetah-v2', type=str)
+    parser.add_argument('--env', default='LunarLAnderContinuous-v2', type=str)
     parser.add_argument('--start_steps', default=10000, type=int)
 
     # DDPG parameters
