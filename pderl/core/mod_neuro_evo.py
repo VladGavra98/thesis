@@ -1,20 +1,19 @@
 import random
 import numpy as np
-from core.ddpg import GeneticAgent, hard_update
 from typing import List
-from core import replay_memory
 import fastrand, math
 import torch
 import torch.distributions as dist
-from core.mod_utils import is_lnorm_key
+from core.mod_utils import is_lnorm_key, hard_update, soft_update
 from parameters import Parameters
 import os
 
+from core.genetic_agent import GeneticAgent
 
 class SSNE:
     def __init__(self, args: Parameters, critic, evaluate):
         self.current_gen = 0
-        self.args = args;
+        self.args = args
         self.critic = critic
         self.population_size = self.args.pop_size
         self.num_elitists = int(self.args.elite_fraction * args.pop_size)
@@ -28,7 +27,7 @@ class SSNE:
     def selection_tournament(self, index_rank, num_offsprings, tournament_size):
         total_choices = len(index_rank)
         offsprings = []
-        for i in range(num_offsprings):
+        for _ in range(num_offsprings):
             winner = np.min(np.random.randint(total_choices, size=tournament_size))
             offsprings.append(index_rank[winner])
 
@@ -41,8 +40,8 @@ class SSNE:
         return sorted(range(len(seq)), key=seq.__getitem__)
 
     def regularize_weight(self, weight, mag):
-        if weight > mag: weight = mag
-        if weight < -mag: weight = -mag
+        weight = torch.clamp(weight, -mag, mag)
+
         return weight
 
     def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
@@ -50,13 +49,13 @@ class SSNE:
         trials = 5
         if self.args.opstat and self.stats.should_log():
             test_score_p1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
                 test_score_p1 += episode['reward']
             test_score_p1 /= trials
 
             test_score_p2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
                 test_score_p2 += episode['reward']
             test_score_p2 /= trials
@@ -95,13 +94,13 @@ class SSNE:
         # Evaluate the children
         if self.args.opstat and self.stats.should_log():
             test_score_c1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
                 test_score_c1 += episode['reward']
             test_score_c1 /= trials
 
             test_score_c2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
                 test_score_c2 += episode['reward']
             test_score_c2 /= trials
@@ -176,7 +175,7 @@ class SSNE:
         trials = 5
         if self.stats.should_log():
             test_score_p = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
                 test_score_p += episode['reward']
             test_score_p /= trials
@@ -301,7 +300,7 @@ class SSNE:
                 'mut_child_fit': test_score_c,
             })
 
-            if self.args.verbose_crossover:
+            if self.args.verbose_mutation:
                 print("==================== Mutation ======================")
                 print("Fitness before: ", test_score_p)
                 print("Fitness after: ", test_score_c)
@@ -338,7 +337,18 @@ class SSNE:
     
     @staticmethod
     def sort_groups_by_distance(genomes, pop):
+        """ Adds all posssible parent-pairs to a group,
+        then sorts them based on distance from largest to smallest.
+
+        Args:
+            genomes (_type_): Parent wieghts.
+            pop (_type_): List of genetic actors.
+
+        Returns:
+            list : sorted groups from most different to msot similar
+        """        
         groups = []
+
         for i, first in enumerate(genomes):
             for second in genomes[i+1:]:
                 groups.append((second, first, SSNE.get_distance(pop[first], pop[second])))
@@ -378,9 +388,9 @@ class SSNE:
 
         # Crossover between elite and offsprings for the unselected genes with 100 percent probability
         if self.args.distil:
-            if self.args.distil_type == 'fitness':
+            if 'fitness' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
-            elif self.args.distil_type == 'dist':
+            elif 'dist' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
             else:
                 raise NotImplementedError('Unknown distilation type')
@@ -400,12 +410,13 @@ class SSNE:
                 self.crossover_inplace(pop[i], pop[j])
 
         # Crossover for selected offsprings
-        for i in offsprings:
-            if random.random() < self.args.crossover_prob:
-                others = offsprings.copy()
-                others.remove(i)
-                off_j = random.choice(others)
-                self.clone(self.distilation_crossover(pop[i], pop[off_j]), pop[i])
+        if self.args.crossover_prob > 0.01:
+            for i in offsprings:
+                if random.random() < self.args.crossover_prob:
+                    others = offsprings.copy()
+                    others.remove(i)
+                    off_j = random.choice(others)
+                    self.clone(self.distilation_crossover(pop[i], pop[off_j]), pop[i])
 
         # Mutate all genes in the population except the new elitists
         for i in range(self.population_size):
