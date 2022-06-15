@@ -73,3 +73,68 @@ def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
             'cros_child1_fit': test_score_c1,
             'cros_child2_fit': test_score_c2,
         })
+
+def mutate_inplace(self, gene: GeneticAgent):
+        trials = 5
+        if self.stats.should_log():
+            test_score_p = 0
+            for _ in range(trials):
+                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
+                test_score_p += episode['reward']
+            test_score_p /= trials
+
+        mut_strength = 0.1
+        num_mutation_frac = 0.1
+        super_mut_strength = 10
+        super_mut_prob = 0.05
+        reset_prob = super_mut_prob + 0.05
+
+        num_params = len(list(gene.actor.parameters()))
+        ssne_probabilities = np.random.uniform(0, 1, num_params) * 2
+        model_params = gene.actor.state_dict()
+
+        for i, key in enumerate(model_params): #Mutate each param
+
+            if is_lnorm_key(key):
+                continue
+
+            # References to the variable keys
+            W = model_params[key]
+            if len(W.shape) == 2: # Only Weights are mutated, no bias
+
+                num_weights= W.shape[0]*W.shape[1]
+                ssne_prob = ssne_probabilities[i]
+
+                if random.random() < ssne_prob:
+                    num_mutations = fastrand.pcg32bounded(int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
+                    for _ in range(num_mutations):
+                        ind_dim1 = fastrand.pcg32bounded(W.shape[0])
+                        ind_dim2 = fastrand.pcg32bounded(W.shape[-1])
+                        random_num = random.random()
+
+                        if random_num < super_mut_prob:  # Super Mutation probability
+                            W[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * W[ind_dim1, ind_dim2])
+                        elif random_num < reset_prob:  # Reset probability
+                            W[ind_dim1, ind_dim2] = random.gauss(0, 1)
+                        else:  # mutation even normal
+                            W[ind_dim1, ind_dim2] += random.gauss(0, mut_strength *W[ind_dim1, ind_dim2])
+
+                        # Regularization hard limit
+                        W[ind_dim1, ind_dim2] = self.regularize_weight(W[ind_dim1, ind_dim2], 1000000)
+
+        if self.stats.should_log():
+            test_score_c = 0
+            for eval in range(trials):
+                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
+                test_score_c += episode['reward']
+            test_score_c /= trials
+
+            self.stats.add({
+                'mut_parent_fit': test_score_p,
+                'mut_child_fit': test_score_c,
+            })
+
+            if self.args.verbose_crossover:
+                print("==================== Mutation ======================")
+                print("Fitness before: ", test_score_p)
+                print("Fitness after: ", test_score_c)

@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from typing import List, Tuple, Dict
-import fastrand, math
+import fastrand
 import torch
 import torch.distributions as dist
 from core.mod_utils import is_lnorm_key, hard_update, soft_update
@@ -11,20 +11,22 @@ import os
 from core.genetic_agent import GeneticAgent
 
 class SSNE:
-    def __init__(self, args: Parameters, critic, evaluate):
+    def __init__(self, args: Parameters, critic : torch.nn, evaluate : callable):
         self.current_gen = 0
         self.args = args
         self.critic = critic
         self.population_size = self.args.pop_size
-        self.num_elitists = int(self.args.elite_fraction * args.pop_size)
+        self.num_elitists = max(int(self.args.elite_fraction * args.pop_size),1)
         self.evaluate = evaluate
         self.stats = PopulationStats(self.args)
-        if self.num_elitists < 1: self.num_elitists = 1
+        
 
         self.rl_policy = None
         self.selection_stats = {'elite': 0, 'selected': 0, 'discarded':0, 'total':0.0000001}
 
-    def selection_tournament(self, index_rank, num_offsprings, tournament_size):
+    def selection_tournament(self, index_rank : List[int], num_offsprings : int, tournament_size : int ) -> List[GeneticAgent]:
+        """ Returns a list of non-elite offsprings.
+        """
         total_choices = len(index_rank)
         offsprings = []
         for _ in range(num_offsprings):
@@ -60,7 +62,6 @@ class SSNE:
                 losses.append(new_agent.update_parameters(batch, gene1.actor, gene2.actor, self.critic))
 
         if self.args.opstat and self.stats.should_log():
-
             test_score_p1 = 0
             trials = 5
             for eval in range(trials):
@@ -95,71 +96,7 @@ class SSNE:
 
         return new_agent
 
-    def mutate_inplace(self, gene: GeneticAgent):
-        trials = 5
-        if self.stats.should_log():
-            test_score_p = 0
-            for _ in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p += episode['reward']
-            test_score_p /= trials
-
-        mut_strength = 0.1
-        num_mutation_frac = 0.1
-        super_mut_strength = 10
-        super_mut_prob = 0.05
-        reset_prob = super_mut_prob + 0.05
-
-        num_params = len(list(gene.actor.parameters()))
-        ssne_probabilities = np.random.uniform(0, 1, num_params) * 2
-        model_params = gene.actor.state_dict()
-
-        for i, key in enumerate(model_params): #Mutate each param
-
-            if is_lnorm_key(key):
-                continue
-
-            # References to the variable keys
-            W = model_params[key]
-            if len(W.shape) == 2: # Only Weights are mutated, no bias
-
-                num_weights= W.shape[0]*W.shape[1]
-                ssne_prob = ssne_probabilities[i]
-
-                if random.random() < ssne_prob:
-                    num_mutations = fastrand.pcg32bounded(int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
-                    for _ in range(num_mutations):
-                        ind_dim1 = fastrand.pcg32bounded(W.shape[0])
-                        ind_dim2 = fastrand.pcg32bounded(W.shape[-1])
-                        random_num = random.random()
-
-                        if random_num < super_mut_prob:  # Super Mutation probability
-                            W[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * W[ind_dim1, ind_dim2])
-                        elif random_num < reset_prob:  # Reset probability
-                            W[ind_dim1, ind_dim2] = random.gauss(0, 1)
-                        else:  # mutation even normal
-                            W[ind_dim1, ind_dim2] += random.gauss(0, mut_strength *W[ind_dim1, ind_dim2])
-
-                        # Regularization hard limit
-                        W[ind_dim1, ind_dim2] = self.regularize_weight(W[ind_dim1, ind_dim2], 1000000)
-
-        if self.stats.should_log():
-            test_score_c = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c += episode['reward']
-            test_score_c /= trials
-
-            self.stats.add({
-                'mut_parent_fit': test_score_p,
-                'mut_child_fit': test_score_c,
-            })
-
-            if self.args.verbose_crossover:
-                print("==================== Mutation ======================")
-                print("Fitness before: ", test_score_p)
-                print("Fitness after: ", test_score_c)
-
+    
     def proximal_mutate(self, gene: GeneticAgent, mag):
         # Based on code from https://github.com/uber-research/safemutations 
         trials = 5
@@ -231,6 +168,8 @@ class SSNE:
                 print("Mean mutation change:", torch.mean(torch.abs(new_params - params)).item())
 
     def clone(self, master: GeneticAgent, replacee: GeneticAgent):  # Replace the replacee individual with master
+        """ Copy weights from master to replacee.
+        """
         for target_param, source_param in zip(replacee.actor.parameters(), master.actor.parameters()):
             target_param.data.copy_(source_param.data)
         replacee.buffer.reset()
@@ -278,15 +217,18 @@ class SSNE:
                 groups.append((second, first, SSNE.get_distance(pop[first], pop[second])))
         return sorted(groups, key=lambda group: group[2], reverse=True)
 
-    def epoch(self, pop: List[GeneticAgent], fitness_evals : np.array | List[float]):
+    def epoch(self, pop: List[GeneticAgent], fitness_evals : np.array or List[float]):
         """ Entire epoch is handled with indices; 
             Index ranks  nets by fitness evaluation - 0 is the best after reversing.
         """ 
         index_rank = np.argsort(fitness_evals)[::-1]
-        elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard
+        elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard -- first indeces
+        print('Elistes:', elitist_index)
 
-        # Selection step
-        offsprings = self.selection_tournament(index_rank, num_offsprings=len(index_rank) - self.num_elitists,
+        # Selection
+        # offsprings are kep for crossover and mutation together with elites
+        offsprings = self.selection_tournament(index_rank, 
+                                               num_offsprings=len(index_rank) - self.num_elitists,
                                                tournament_size=3)
 
         # Figure out unselected candidates
@@ -305,29 +247,31 @@ class SSNE:
             elif self.rl_policy in unselects: self.selection_stats['discarded'] += 1.0
             self.rl_policy = None
 
-        # Elitism step, assigning elite candidates to some unselects
+        # Elitism 
+        # >> assigning elite candidates to some unselects
         for i in elitist_index:
             try: replacee = unselects.pop(0)
             except: replacee = offsprings.pop(0)
             new_elitists.append(replacee)
             self.clone(master=pop[i], replacee=pop[replacee])
 
-        # Crossover between elite and offsprings for the unselected genes with 100 percent probability
+        # Crossover 
+        # >> between elite and offsprings for the unselected genes with 100 percent probability
         if 'fitness' in self.args.distil_type.lower():
             sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
         elif 'dist' in self.args.distil_type.lower():
             sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
         else:
             raise NotImplementedError('Unknown distilation type')
+
         for i, unselected in enumerate(unselects):
             first, second, _ = sorted_groups[i % len(sorted_groups)]
             if fitness_evals[first] < fitness_evals[second]:
                 first, second = second, first
             self.clone(self.distilation_crossover(pop[first], pop[second]), pop[unselected])
 
-
         # Crossover for selected offsprings
-        if self.args.crossover_prob > 0.01:
+        if self.args.crossover_prob > 0.01:  # so far this is not called
             for i in offsprings:
                 if random.random() < self.args.crossover_prob:
                     others = offsprings.copy()
@@ -335,18 +279,18 @@ class SSNE:
                     off_j = random.choice(others)
                     self.clone(self.distilation_crossover(pop[i], pop[off_j]), pop[i])
 
-        # Mutate all genes in the population except the new elitists
-        for i in range(self.population_size):
-            if i not in new_elitists:  # Spare the new elitists
-                if random.random() < self.args.mutation_prob:
-                    if self.args.proximal_mut:
-                        self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
-                    else:
-                        self.mutate_inplace(pop[i])
+        # Mutate all genes in the population 
+        #  EXCEPT the new elitists
+        for i in index_rank[self.num_elitists:]:
+            if fastrand.pcg32bounded(100)/100 < self.args.mutation_prob:
+                print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
+                self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
+
 
         if self.stats.should_log():
             self.stats.log()
         self.stats.reset()
+
         return new_elitists[0]
 
 

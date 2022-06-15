@@ -46,10 +46,10 @@ class Parameters:
         self.gamma = 0.98
         self.tau = 0.005   
         self.seed = cla.seed
-        self.batch_size = 128
+        self.batch_size = 256
         self.frac_frames_train = 1.0
         self.use_done_mask = True
-        self.buffer_size = 200000  #50000
+        self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
         

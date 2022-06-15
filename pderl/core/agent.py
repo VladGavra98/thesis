@@ -4,12 +4,11 @@ from core import mod_utils as utils
 from core import replay_memory
 from core import ddpg as ddpg
 from core import td3 as td3
-from scipy.spatial import distance
 from core import replay_memory
 from parameters import Parameters
 from pderl.core import genetic_agent, mod_utils
 
-
+from tqdm import tqdm
 
 class Agent:
     def __init__(self, args: Parameters, wrapper):
@@ -89,7 +88,7 @@ class Agent:
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
-            next_state, reward, done, info = self.env.step(action.flatten())
+            next_state, reward, done, _ = self.env.step(action.flatten())
             total_reward += reward
 
             # Add experiences to buffer:
@@ -129,11 +128,13 @@ class Agent:
         return novelties / epochs
 
     def train_rl(self):
-        """ Update the RL agent 
+        """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
+            The frames are sampled from the common buffer.
         """
+        print('Train RL agent ...')
         pgs_obj, TD_loss = [], []
         if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
-            for _ in range(int(self.gen_frames)):
+            for _ in tqdm(range(int(self.gen_frames))):
                 self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
@@ -256,7 +257,7 @@ class Agent_ddpg:
 
         # Trackers
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
-
+    
     def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG, is_action_noise=False,
                  store_transition=True) -> tuple:
         """ Play one game to evaualute the agent.
