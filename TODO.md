@@ -8,6 +8,7 @@
 - [x] Find what is a solution in pyribs
 - [x] Run a couple of basic scenarios on Lunar Lander
 
+
 > week 8: 11/04 - 15/04
 - [x] Make a Gantt Chart
 - [x] Read the QD paper on CMAP-Elites
@@ -43,7 +44,6 @@
   - [x] tricks
   - [x] results
 
-
 > week 13: 23/05 - 27/05
 - [x] Rerun archive map on LunarLander Nominal
 - [x] Explain the testing environment
@@ -74,6 +74,7 @@
   
   
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
+
 ## Prepare Presentation:
 - [ ] Schedule it
 - [ ] Gather other presentations
@@ -81,6 +82,7 @@
 - [ ] Literature review
 - [ ] Method
 - [ ] Preliminary results
+
 
 
 # Ideas
