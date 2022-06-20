@@ -2,14 +2,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.nn import functional as F
-from parameters import Parameters
 from core import replay_memory
-from core.mod_utils import is_lnorm_key
-
 
 from core.genetic_agent import Actor
-from core.mod_utils import hard_update, soft_update, LayerNorm, GaussianNoise, OUNoise
+from core.mod_utils import hard_update, soft_update, LayerNorm
 
+from typing import Tuple, Dict, List
 
 class Critic(nn.Module):
 
@@ -99,7 +97,7 @@ class TD3(object):
         hard_update(self.critic_target, self.critic)
 
 
-    def update_parameters(self, batch, iteration):
+    def update_parameters(self, batch, iteration : int) -> Tuple[float,float]:
         pgl = None
         state_batch, action_batch, next_state_batch, reward_batch, done_batch = batch
 
@@ -115,7 +113,6 @@ class TD3(object):
             if self.args.use_done_mask: done_batch = done_batch.to(self.args.device)
 
             # Select action according to policy 
-            # TODO: add clipped noise 
             next_action_batch = self.actor_target.forward(next_state_batch)
 
             # Compute the target Q values
@@ -137,7 +134,6 @@ class TD3(object):
         self.critic_optim.step()
 
         # Actor Update
-        # TODO: add dealyed udpate
         if iteration % self.args.policy_update_freq ==0:
             self.actor_optim.zero_grad()
             # retrieve value of the first critic
