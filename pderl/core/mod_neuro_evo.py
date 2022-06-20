@@ -117,15 +117,11 @@ class SSNE:
         tot_size = model.count_parameters()
         num_outputs = output.size()[1]
 
-        if self.args.mutation_noise:
-            mag_dist = dist.Normal(self.args.mutation_mag, 0.02)
-            mag = mag_dist.sample()
 
         # initial perturbation
         normal = dist.Normal(torch.zeros_like(params), torch.ones_like(params) * mag)
         delta = normal.sample()
-        # uniform = delta.clone().detach().data.uniform_(0, 1)
-        # delta[uniform > 0.1] = 0.0
+
 
         # we want to calculate a jacobian of derivatives of each output's sensitivity to each parameter
         jacobian = torch.zeros(num_outputs, tot_size).to(self.args.device)
