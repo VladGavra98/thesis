@@ -60,9 +60,9 @@ class Agent:
         self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
         self.rl_iteration = 0 # for TD3 delyed policy updates
 
-    def evaluate(self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
-                is_action_noise=False,
-                 store_transition = True) -> tuple:
+    def evaluate (self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
+                  is_action_noise : bool  = False,
+                 store_transition : bool = True) -> tuple:
         """ Play one game to evaualute the agent.
 
         Args:
@@ -79,9 +79,9 @@ class Agent:
         done = False
 
         while not done: 
-            # play one 'game'
-
+            # select action
             action = agent.actor.select_action(np.array(state))
+
             if is_action_noise:
                 clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
                 action += clipped_noise
@@ -91,6 +91,9 @@ class Agent:
             next_state, reward, done, _ = self.env.step(action.flatten())
             total_reward += reward
 
+            # Compaute BCs:
+            # TODO: add code
+            
             # Add experiences to buffer:
             if store_transition:
                 transition = (state, action, next_state, reward, float(done))
@@ -104,7 +107,7 @@ class Agent:
         if store_transition: 
             self.num_games += 1
 
-        return {'reward': total_reward}
+        return {'reward': total_reward, 'bcs': (0.,0.)}
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
