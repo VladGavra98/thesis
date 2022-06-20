@@ -273,7 +273,7 @@ class SSNE:
         # Crossover for selected offsprings
         if self.args.crossover_prob > 0.01:  # so far this is not called
             for i in offsprings:
-                if random.random() < self.args.crossover_prob:
+                if fastrand.pcg32bounded(100)/100 < self.args.crossover_prob:
                     others = offsprings.copy()
                     others.remove(i)
                     off_j = random.choice(others)
@@ -283,7 +283,7 @@ class SSNE:
         #  EXCEPT the new elitists
         for i in index_rank[self.num_elitists:]:
             if fastrand.pcg32bounded(100)/100 < self.args.mutation_prob:
-                print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
+                # print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
                 self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
 
 
