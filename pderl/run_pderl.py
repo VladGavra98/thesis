@@ -7,7 +7,7 @@ import wandb
 from envs.lunarlander import LunarLanderWrapper
 
 '''                           Globals                                                        '''
-num_games = 10
+num_games = 100
 num_frames = num_games * 200
 
 # -store_true means that it becomes true if I mention the argument
