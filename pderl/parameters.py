@@ -1,6 +1,6 @@
 import pprint
-import torch
 import os
+import torch
 
 
 class Parameters:
@@ -52,9 +52,9 @@ class Parameters:
         self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
-        
+
         # hidden layer
-        self.ls = 128
+        self.hidden_size = 128
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -68,7 +68,7 @@ class Parameters:
         self.policy_update_freq = 2    # minimum for TD3
         self.noise_clip         = 0.5  # default
 
-        # =================================   NeuroEvolution Params =============================================
+        # =================================   NeuroEvolution Params =====================================
 
         # Num of trials
         if cla.env == 'Walker2d-v2':
@@ -86,7 +86,6 @@ class Parameters:
         self.crossover_prob = 0.0
         self.mutation_prob = 0.9
         self.mutation_mag = cla.mut_mag
-        self.mutation_noise = cla.mut_noise
         self.mutation_batch_size = 256
         self.proximal_mut = cla.proximal_mut
         self.distil = cla.distil
@@ -99,14 +98,14 @@ class Parameters:
 
         # Variation operator statistics
         self.opstat = cla.opstat
-        self.opstat_freq = cla.opstat_freq
+        self.opstat_freq = 1
         self.test_operators = cla.test_operators
 
         # Save Results
         self.state_dim = None  # To be initialised externally
         self.action_dim = None  # To be initialised externally
         self.save_foldername = 'pderl/tmp_logs'
- 
+
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
 
@@ -123,5 +122,4 @@ class Parameters:
             print(params)
 
         return self.__dict__
-
   
