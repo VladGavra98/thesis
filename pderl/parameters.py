@@ -19,7 +19,6 @@ class Parameters:
         self.env_name = cla.env
         self.save_periodic = cla.save_periodic if cla.save_periodic else False
         
-
         # Number of Frames to Run
         if cla.frames:
             self.num_frames = cla.frames

@@ -3,7 +3,7 @@ import gym
 from gym.spaces import Box
 import nacl
 import numpy as np
-import citation
+import envs.citation as citation
 from typing import Tuple, List, Dict
 
 class BaseEnv(gym.Env, ABC):

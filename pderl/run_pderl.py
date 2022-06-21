@@ -2,13 +2,13 @@ import numpy as np
 import os
 import time
 import random
-from core import mod_utils as utils, agent
+from core import agent
 import torch
 import argparse
 from parameters import Parameters
 import wandb
-from envs.lunarlander import LunarLanderWrapper
-from dask.distributed import Client, progress
+import envs.config
+
 
 '''                           Globals                                                        '''
 num_games = 10
@@ -16,8 +16,10 @@ num_frames = num_games * 200
 
 # -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
+
+parser.add_argument('-should_log', help='Wether the WandB loggers are used', action='store_true')
 parser.add_argument('-run_name', default='test', type=str)
-parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2)',type=str, default='LunarLanderContinuous-v2')
+parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2) (PHLab)',type=str, default='LunarLanderContinuous-v2')
 parser.add_argument('-use_ddpg', help='Wether to use DDPG or TD3 for the RL part. Defaults to TD3',action='store_true', default=False)
 parser.add_argument('-frames', help='Number of frames to learn from', default=num_frames, type=int)
 
@@ -50,7 +52,7 @@ parser.add_argument('-next_save', help='Generation save frequency for save_perio
 # ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def save_agents(parameters: object, elite_index: int = None):
+def save_agent (agent, parameters: object, elite_index: int = None):
     """ Save the trained agents.
 
     Args:
@@ -69,15 +71,13 @@ def save_agents(parameters: object, elite_index: int = None):
                                                                            'elite_net.pkl'))
     print("Progress Saved")
 
-
 if __name__ == "__main__":
     cla = parser.parse_args()
     # Inject the cla arguments in the parameters object
     parameters = Parameters(cla)
 
     # Create Env
-    wrapper = LunarLanderWrapper()
-    env = wrapper.env
+    env = envs.config.select_env(cla.env)
 
     parameters.action_dim = env.action_space.shape[0]
     parameters.state_dim = env.observation_space.shape[0]
@@ -86,14 +86,16 @@ if __name__ == "__main__":
     params_dict = parameters.write_params()
 
     # strat trackers
-    run = wandb.init(project="pderl_phlab",
-                     entity="vgavra",
-                     dir='../logs',
-                     name=cla.run_name,
-                     config=params_dict)
-    parameters.save_foldername = str(run.dir)
-    wandb.config.update({"save_foldername": parameters.save_foldername,
-                        "run_name": run.name}, allow_val_change=True)
+    if cla.should_log:
+        print('\033[1;32m WandB logging started')
+        run = wandb.init(project="pderl_phlab",
+                        entity="vgavra",
+                        dir='../logs',
+                        name=cla.run_name,
+                        config=params_dict)
+        parameters.save_foldername = str(run.dir)
+        wandb.config.update({"save_foldername": parameters.save_foldername,
+                            "run_name": run.name}, allow_val_change=True)
 
     # Seed
     env.seed(parameters.seed)
@@ -140,17 +142,21 @@ if __name__ == "__main__":
             agent.evolver.selection_stats['total']
         stats['discarded_fraction'] = agent.evolver.selection_stats['discarded'] / \
             agent.evolver.selection_stats['total']
-        wandb.log(stats)  # main call to wandb logger
+        
+        if cla.should_log:
+            wandb.log(stats)  # main call to wandb logger
 
         # Get index of best actor
         elite_index = stats['elite_index']  # champion index
 
         # Save Policy
-        if agent.num_games > next_save:
+        if cla.should_log and agent.num_games > next_save:
             next_save += parameters.next_save
-            save_agents(parameters, elite_index)
+            save_agent(agent, parameters, elite_index)
 
     # Save final model:
-    save_agents(parameters, elite_index)
+    if cla.should_log:
+        save_agent(agent, parameters, elite_index)
 
-    run.finish()
+    if cla.should_log:
+        run.finish()
