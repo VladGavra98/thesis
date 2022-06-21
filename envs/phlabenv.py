@@ -99,6 +99,10 @@ class CitationEnv(BaseEnv):
     def get_reward(self) -> float:
         # todo: parameterize reward function:
         return - 1000.0 * self.get_error()**2
+    
+    def get_bcs(self) -> Tuple[float, float]:
+        """ Return behavioural characteristic """
+        return (0.,0.)
 
     def reset(self, **kwargs) -> np.ndarray:
         # Reset time
@@ -121,7 +125,14 @@ class CitationEnv(BaseEnv):
         return self.x
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
-        """ gym-like step function returns: (state, reward, done, info) """
+        """ Gym-like step function returns: (state, reward, done, info) 
+
+        Args:
+            action (np.ndarray): Un-sclaled action to be taken.
+
+        Returns:
+            Tuple[np.ndarray, float, bool, dict]: new_state, obtained reward, is_done mask, {refference signal value, behavioural characteristic}
+        """        
 
         # todo: clip the action vector between [-1, 1]
 
@@ -143,11 +154,9 @@ class CitationEnv(BaseEnv):
         # Done:
         is_done = self.t >= self.t_max
 
+
         # info:
         info = {
-            "t": self.t,
-            "x": self.x,
-            "u": scaled_action,
             "ref": self.get_reference(),
         }
 
@@ -173,9 +182,6 @@ class CitationEnv(BaseEnv):
         """
         
         total_reward = 0.0
-        impact_x_pos = None
-        impact_y_vel = None
-        all_y_vels = []
 
         # reset env
         done = False
@@ -196,24 +202,8 @@ class CitationEnv(BaseEnv):
             state = next_state
 
 
-            # Boudnary characteristics (BCs):
-            x_pos = state[0]
-            y_vel = state[3]
-            leg0_touch = bool(state[6])
-            leg1_touch = bool(state[7])
-            all_y_vels.append(y_vel)
 
-            # Check if the lunar lander is impacting for the first time.
-            if impact_x_pos is None and (leg0_touch or leg1_touch):
-                impact_x_pos = x_pos
-                impact_y_vel = y_vel
-
-        # if no impact edge case
-        if impact_x_pos is None:
-            impact_x_pos = x_pos
-            impact_y_vel = min(all_y_vels)
-
-        return {'total_reward':total_reward, 'bcs': (impact_x_pos,impact_y_vel)}
+        return {'total_reward':total_reward}
 
     @staticmethod
     def finish():
@@ -235,5 +225,22 @@ if __name__=='__main__':
     actor = Actor( env.observation_space.shape[0], env.action_space.shape[0])
 
     # Simulate one episode
-    env.simulate(actor)
+    total_reward = 0.0
 
+    # reset env
+    done = False
+    state = env.reset()
+
+    while not done:
+
+        # Actor:
+        action = env.scale_action(actor.select_action(np.array(state)))
+
+        # Simulate one step in environment
+        next_state, reward, done, info = env.step(action.flatten())
+
+        # Update
+        total_reward += reward
+        state = next_state
+
+    env.finish()

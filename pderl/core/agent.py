@@ -91,11 +91,11 @@ class Agent:
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
-            next_state, reward, done, _ = self.env.step(action.flatten())
+            next_state, reward, done, info = self.env.step(action.flatten())
             total_reward += reward
 
-            # Compaute BCs:
-            # TODO: add code
+            # Compute BCs:
+            bcs = self.env.get_bc
 
             # Add experiences to buffer:
             if store_transition:
@@ -111,7 +111,7 @@ class Agent:
         if store_transition: 
             self.num_games += 1
 
-        return {'reward': total_reward, 'bcs': (0.,0.)}
+        return {'reward': total_reward, 'bcs': info['bcs']}
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
