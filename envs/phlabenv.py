@@ -6,6 +6,9 @@ import numpy as np
 import envs.citation as citation
 from typing import Tuple, List, Dict
 
+
+
+
 class BaseEnv(gym.Env, ABC):
     """ Base class to be able to write generic training & eval code
     that applies to all Citation environment variations. """
@@ -38,48 +41,88 @@ class BaseEnv(gym.Env, ABC):
     def get_reward(self) -> float:
         pass
 
-    def scale_action(self, action: np.ndarray) -> np.ndarray:
-        """Scale the actions from [-1, 1] to the appropriate scale of the action space."""
+    def unscale_action(self, action : np.ndarray) -> np.ndarray:
+        """
+        Rescale the action from [action_space.low, action_space.high] to [-1, 1]
+
+        Args:
+            action (mp.ndarray): Action in the physical limits
+
+        Returns:
+            np.ndarray: Action vector in the [-1,1] interval for learning tasks
+        """        
         low, high = self.action_space.low, self.action_space.high
-        action = low + 0.5 * (action + 1.0) * (high - low)
-        return action
+        return 2.0 * ((action - low) / (high - low)) - 1.0
+
+
+    def scale_action(self, scaled_action : np.ndarray) -> np.ndarray:
+        """ Scale the action from [-1, 1] to [action_space.low, action_space.high]
+        (no need for symmetric action space)
+
+        Args:
+            scaled_action (mp.ndarray): _description_
+
+        Returns:
+            np.ndarray: action vector in the physical limits
+        """        
+        low, high = self.action_space.low, self.action_space.high
+        return low + 0.5 * (scaled_action + 1.0) * (high - low)
 
 
 class CitationEnv(BaseEnv):
     """ Example citation wrapper with p-control reward function. """
 
-    n_actions = 10
-    n_obs = 12
+    n_actions_full = 10
+    n_obs_full = 12
 
-    def __init__(self):
+    def __init__(self, configuration : str = None):
         self.t = 0
         self.dt = 0.01
         self.t_max = 5.0   #5 sec episodes
 
         # Have an internal storage of state [12]
-        # 0, 1, 2   -> p, q, r
-        # 3, 4, 5   -> V, alpha, beta
-        # 6, 7, 8   -> phi, theta, psi
-        # 9, 10, 11  -> he, xe, ye,
-        self.x: np.ndarray = None
+        # 0,  1, 2   -> p, q, r
+        # 3,  4, 5   -> V, alpha, beta
+        # 6,  7, 8   -> phi, theta, psi
+        # 9, 10, 11  -> he, xe, ye
+        self.obs: np.ndarray  = None    # observation vector
+        self.x: np.ndarray  = None      # controllable state vector (useful for configurations)
+        self.state_idx:list = None
 
         # Have an internal storage of last action [10]
+        # Inputs:
+        #   0 de      , 1 da      , 2 dr
+        #   3 trim de , 4 trim da , 5 trim dr
+        #   6 df      , 7 gear
+        #   8 throttle1 9 throttle2
         self.last_u: np.ndarray = None
+
+        if 'symmetric' or 'sym' in configuration.lower():
+            print('Symmetric control only.')
+            self.n_actions = 1   
+            self.state_idx = [1,3,4,7]
+            self.n_obs = len(self.state_idx)
+        else:
+            print('Full attitude control.')
+            self.n_actions = 3
+            self.state_idx = range(10)
+            self.n_obs = len(self.state_idx)
+            assert self.n_obs == self.n_obs_full
 
     @property
     def action_space(self) -> Box:
         return Box(
-            low=-100 * np.ones(self.n_actions),
-            high=100 * np.ones(self.n_actions),
-            dtype=np.float64,
+            low   = -30 * np.ones(self.n_actions),
+            high  = 30 * np.ones(self.n_actions),
+            dtype = np.float64,
         )
 
     @property
     def observation_space(self) -> Box:
         return Box(
-            low=-100 * np.ones(self.n_obs),
-            high=100 * np.ones(self.n_obs),
-            dtype=np.float64,
+            low   = -100 * np.ones(self.n_obs),
+            high  = 100 * np.ones(self.n_obs),
+            dtype = np.float64,
         )
 
     # todo: make this a vector
@@ -117,10 +160,12 @@ class CitationEnv(BaseEnv):
         # citation.terminate()
         citation.initialize()
 
-        # Make a zero input step to retreive the state
-        u = np.zeros(self.n_actions)
-        self.x = citation.step(u)
+        # Make a full-zero input step to retreive the state
+        u = np.zeros(self.n_actions_full)
         self.last_u = u
+
+        self.obs = citation.step(u)
+        self.x = self.obs[self.state_idx]  # isolate states from obs
 
         return self.x
 
@@ -128,22 +173,24 @@ class CitationEnv(BaseEnv):
         """ Gym-like step function returns: (state, reward, done, info) 
 
         Args:
-            action (np.ndarray): Un-sclaled action to be taken.
+            action (np.ndarray): Un-sclaled action in the interval [-1,1] to be taken.
 
         Returns:
             Tuple[np.ndarray, float, bool, dict]: new_state, obtained reward, is_done mask, {refference signal value, behavioural characteristic}
         """        
 
-        # todo: clip the action vector between [-1, 1]
-
-        # Scale [1, 1] action to the action space
+        # pad action to correpond to the Simulink dimensions
         scaled_action = self.scale_action(action)
+        scaled_action = np.pad(scaled_action,
+                        (0, self.n_actions_full - self.n_actions), 
+                        'constant', constant_values = (0.))
+
         self.last_u = scaled_action
 
         # todo: Implement incremental control: scaled_action is delta_u -> u += delta_u
 
         # Step the system
-        self.x = citation.step(scaled_action)
+        self.obs = citation.step(scaled_action)
 
         # Step the time
         self.t += self.dt
@@ -154,61 +201,24 @@ class CitationEnv(BaseEnv):
         # Done:
         is_done = self.t >= self.t_max
 
-
         # info:
         info = {
             "ref": self.get_reference(),
         }
 
-        return self.x, reward, is_done, info
+        return self.obs, reward, is_done, info
 
     def render(self, **kwargs):
         """ just to make the linter happy (we are deriving from gym.Env)"""
         pass
 
-    def simulate (self, actor : object,
-                render : bool = False) -> Dict[float, tuple]:
-        """ Wrapper function for the gym LunarLander enviornment. It can include the faulty cases:
-                -> broken main engine
-                -> faulty navigation snesors (i.e., nosiy position)
-
-        Args:
-            actor (object): Actor class that has the select_action() method
-            env (object): Environment with OpenAI Gym API (make(), reset(),step())
-            render (bool, optional): Should render the video env. Defaults to False.
-    
-        Returns:
-            tuple: Reward (float),
-        """
-        
-        total_reward = 0.0
-
-        # reset env
-        done = False
-        state = self.reset()
-
-        while not done:
-            if render:
-                self.render()
-
-            # Actor:
-            action = self.scale_action(actor.select_action(np.array(state)))
-
-            # Simulate one step in environment
-            next_state, reward, done, info = self.step(action.flatten())
-
-            # Update
-            total_reward += reward
-            state = next_state
-
-
-
-        return {'total_reward':total_reward}
-
     @staticmethod
     def finish():
         """ Terminate the simulink thing."""
         citation.terminate()
+
+
+
 
 class Actor():
     # NOTE for testing the environment implementation
@@ -217,12 +227,13 @@ class Actor():
         self.policy = np.random.rand(action_dim, state_dim,)
 
     def select_action(self,state):
-        return self.policy @ state
+        return (self.policy @ state)/100
 
 if __name__=='__main__':
     # NOTE for testing the environment implementation
-    env = CitationEnv()
-    actor = Actor( env.observation_space.shape[0], env.action_space.shape[0])
+    env = CitationEnv(configuration='symmetric')
+    actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
+    
 
     # Simulate one episode
     total_reward = 0.0
@@ -234,13 +245,18 @@ if __name__=='__main__':
     while not done:
 
         # Actor:
-        action = env.scale_action(actor.select_action(np.array(state)))
+        scaled_action = actor.select_action(np.array(state))
+        action = env.scale_action(scaled_action)
+        
 
         # Simulate one step in environment
-        next_state, reward, done, info = env.step(action.flatten())
+        obs, reward, done, info = env.step(action.flatten())
+        next_state = obs[env.state_idx]
 
+        print(f'de: {action[0]:.03}  q:{state[0]:.03f}  V:{state[1]:.03f}  alpha:{state[2]:.03f}  theta:{state[3]:.03f}')
         # Update
         total_reward += reward
         state = next_state
+
 
     env.finish()
