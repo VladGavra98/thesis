@@ -13,9 +13,9 @@ import dask
 
 
 class Agent:
-    def __init__(self, args: Parameters, wrapper):
+    def __init__(self, args: Parameters, environment):
         self.args = args; 
-        self.env = wrapper.env
+        self.env = environment
 
         # Init population
         self.pop = []
@@ -104,6 +104,7 @@ class Agent:
                 self.replay_buffer.add(*transition)
                 agent.buffer.add(*transition)
 
+            # update agent state
             state = next_state
 
         # updated games if is done
@@ -155,7 +156,7 @@ class Agent:
     def train(self):
         self.gen_frames = 0
         self.iterations += 1
-        results , test_scores, tests_rl    = [],[],[]
+        results , test_scores, tests_rl = [],[],[]
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
@@ -180,7 +181,6 @@ class Agent:
         worst_train_fitness = np.min(rewards)
         population_avg      = np.average(rewards)    #  population_avg -- average over the entire agent population
         champion            = self.pop[np.argmax(rewards)]
-
 
         # Evaluate the champion
         for _ in range(self.validation_tests):

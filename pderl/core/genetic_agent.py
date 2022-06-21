@@ -40,11 +40,15 @@ class GeneticAgent:
         p2_action = p2(state_batch)
 
         #  Redeem parents' Qs
-        p1_q1,p1_q2 = critic(state_batch, p1_action)
-        p1_q = torch.min(p1_q1,p1_q2).flatten()
-        p2_q1,p2_q2 = critic(state_batch, p2_action)
-        p2_q = torch.min(p2_q1,p2_q2).flatten()
 
+        if self.args.use_ddpg:
+            p1_q = critic(state_batch, p1_action).flatten()
+            p2_q = critic(state_batch, p2_action).flatten()
+        else:
+            p1_q1,p1_q2 = critic(state_batch, p1_action)
+            p1_q = torch.min(p1_q1,p1_q2).flatten()
+            p2_q1,p2_q2 = critic(state_batch, p2_action)
+            p2_q = torch.min(p2_q1,p2_q2).flatten()
 
         #  Select best behaving pparent based on Q-filtering:
         eps = 0.0  # selection threshold -- how much better one action is wrt the other

@@ -82,7 +82,7 @@ class DDPG(object):
         dt = (current_q - target_q).abs()
         return dt.item()
 
-    def update_parameters(self, batch):
+    def update_parameters(self, batch, iteration : int):
         state_batch, action_batch, next_state_batch, reward_batch, done_batch = batch
 
         # Load everything to GPU if not already

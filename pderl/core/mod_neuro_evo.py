@@ -20,7 +20,6 @@ class SSNE:
         self.evaluate = evaluate
         self.stats = PopulationStats(self.args)
         
-
         self.rl_policy = None
         self.selection_stats = {'elite': 0, 'selected': 0, 'discarded':0, 'total':0.0000001}
 
@@ -219,7 +218,7 @@ class SSNE:
         """ 
         index_rank = np.argsort(fitness_evals)[::-1]
         elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard -- first indeces
-        print('Elistes:', elitist_index)
+        # print('Elites:', elitist_index)
 
         # Selection
         # offsprings are kep for crossover and mutation together with elites

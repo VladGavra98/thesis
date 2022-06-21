@@ -40,7 +40,7 @@ parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover',help='Make crossovers verbose', action='store_true')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
-
+parser.add_argument('-test_operators', help='Test the variational operators', action='store_true')
 
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     parameters.write_params(stdout=True)
 
     # Create Agent
-    agent = agent.Agent(parameters, wrapper)
+    agent = agent.Agent(parameters, env)
     print('Running', parameters.env_name, ' State_dim:',
           parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
