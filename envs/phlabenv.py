@@ -1,12 +1,12 @@
+import envs.citation as citation
+from signals.stochastic_signals import RandomizedCosineStepSequence
+import signals
+
 from abc import ABC, abstractmethod
 import gym
 from gym.spaces import Box
-import nacl
 import numpy as np
-import envs.citation as citation
 from typing import Tuple, List, Dict
-
-
 
 
 class BaseEnv(gym.Env, ABC):
@@ -56,8 +56,8 @@ class BaseEnv(gym.Env, ABC):
 
 
     def scale_action(self, scaled_action : np.ndarray) -> np.ndarray:
-        """ Scale the action from [-1, 1] to [action_space.low, action_space.high]
-        (no need for symmetric action space)
+        """ Scale the action from [-1, 1] to [action_space.low, action_space.high]. 
+        Might not be needed always since it depends on the activation of the output layer. 
 
         Args:
             scaled_action (mp.ndarray): _description_
@@ -85,9 +85,9 @@ class CitationEnv(BaseEnv):
         # 3,  4, 5   -> V, alpha, beta
         # 6,  7, 8   -> phi, theta, psi
         # 9, 10, 11  -> he, xe, ye
-        self.obs: np.ndarray  = None    # observation vector
-        self.x: np.ndarray  = None      # controllable state vector (useful for configurations)
-        self.state_idx:list = None
+        self.obs: np.ndarray     = None    # observation vector
+        self.x: np.ndarray       = None      # controllable state vector (useful for configurations)
+        self.state_idx:List[int] = None
 
         # Have an internal storage of last action [10]
         # Inputs:
@@ -97,23 +97,41 @@ class CitationEnv(BaseEnv):
         #   8 throttle1 9 throttle2
         self.last_u: np.ndarray = None
 
+        # refference to track
+        self.ref: signals.BaseSignal = None
+        
+        # actuator bounds
+        self.rate_bound = np.deg2rad(20)    # 20 deg/s boudns
+
         if 'symmetric' or 'sym' in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1   
-            self.state_idx = [1,3,4,7]
+            self.state_idx = [1,3,4,7]  # slicing for symmetric states --  q, V,alpha, theta
+            self.n_obs = len(self.state_idx)
+        elif 'att' in configuration.lower():
+            print('Attitude control.')
+            self.n_actions = 3   
+            self.state_idx = range(8)  # all but no xe,ye
             self.n_obs = len(self.state_idx)
         else:
             print('Full attitude control.')
             self.n_actions = 3
-            self.state_idx = range(10)
-            self.n_obs = len(self.state_idx)
+            self.state_idx = range(10)    # all states 
+            self.n_obs = len(self.state_idx)     
             assert self.n_obs == self.n_obs_full
+
+        # error
+        self.error : np.ndarray = np.zeros((1,self.n_actions))
+
+        # reward stuff
+        self.cost = 6/np.pi             # scaler
+        self.max_bound = np.ones(self.error.shape)   # bounds
 
     @property
     def action_space(self) -> Box:
         return Box(
-            low   = -30 * np.ones(self.n_actions),
-            high  = 30 * np.ones(self.n_actions),
+            low   = -self.rate_bound * np.ones(self.n_actions),
+            high  = self.rate_bound * np.ones(self.n_actions),
             dtype = np.float64,
         )
 
@@ -125,40 +143,79 @@ class CitationEnv(BaseEnv):
             dtype = np.float64,
         )
 
-    # todo: make this a vector
+    @property
+    def V(self):
+        return self.obs[3] 
+    @property
+    def alpha(self) -> float:
+        return self.obs[4] 
+    @property
+    def beta(self) -> float:
+        return self.obs[5]        
+    @property
+    def theta(self):
+        return self.obs[7]
+    @property
+    def phi(self) -> float:
+        return self.obs[6]
+    @property
+    def psi(self) -> float:
+        return self.obs[8]
+
     def get_reference(self) -> float:
-        # For example a step reference (  have my own class to generate signals)
-        return 1.0 if self.t > 5.0 else 0.0
+        return self.ref(self.t)
 
-    # todo: make this a vector
     def get_controlled_state(self) -> float:
-        # for example let's control p:
-        return self.x[0]
+        return self.theta
 
-    # todo: make this a vector
+
     def get_error(self) -> float:
-        return self.get_reference() - self.get_controlled_state()
+        self.error[0,:] = np.array(self.get_reference() - self.get_controlled_state())
+
 
     def get_reward(self) -> float:
-        # todo: parameterize reward function:
-        return - 1000.0 * self.get_error()**2
+        # compute error
+        self.get_error()
+        
+        # reward shapes
+        # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30)**2, max_bound), -max_bound))  # square function
+        # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30), max_bound), -max_bound))  # rational function
+        # reward_vec = - np.maximum(np.minimum(1 / (np.abs(self.error) * 10 + 1), max_bound),    - max_bound)  # abs. linear function
+
+        reward_vec = 1/3 * np.linalg.norm( np.clip( self.cost * self.error , -self.max_bound, self.max_bound), ord=1)
+
+        reward = -reward_vec.sum() / self.error.shape[0]
+        return reward
     
     def get_bcs(self) -> Tuple[float, float]:
         """ Return behavioural characteristic """
         return (0.,0.)
 
+    def check_nan():
+        raise NotImplementedError
+    
+    def check_envelope_bounbds():
+        raise NotImplementedError
+
     def reset(self, **kwargs) -> np.ndarray:
         # Reset time
         self.t = 0.0
 
-        # todo: Reset actuators (in case of incmrenetal control
-
-        # todo: If training -> randomize reference signal sequence
+        # todo: Reset actuators (in case of incremental control
 
         # Initalize the simulink model
-        # todo: check if initialize() resets the citation to initial conditions! (if not we have to reimport terminate first?)
         # citation.terminate()
         citation.initialize()
+
+        # Randomize reference signal sequence
+        self.ref = RandomizedCosineStepSequence(
+                    t_max=self.t_max,
+                    ampl_max=25,
+                    block_width=9,
+                    smooth_width=3.0,
+                    n_levels=10,
+                    vary_timings=0.1,
+                    )
 
         # Make a full-zero input step to retreive the state
         u = np.zeros(self.n_actions_full)
@@ -180,17 +237,21 @@ class CitationEnv(BaseEnv):
         """        
 
         # pad action to correpond to the Simulink dimensions
-        scaled_action = self.scale_action(action)
+        scaled_action = self.scale_action(action)   # scaled to actuator limits i.e. -20,+20 deg/s
         scaled_action = np.pad(scaled_action,
                         (0, self.n_actions_full - self.n_actions), 
                         'constant', constant_values = (0.))
 
-        self.last_u = scaled_action
 
-        # todo: Implement incremental control: scaled_action is delta_u -> u += delta_u
+        # incremental control input: 
+        u = self.last_u + scaled_action * self.dt
+        self.last_u = u
 
         # Step the system
-        self.obs = citation.step(scaled_action)
+        self.obs = citation.step(u)
+
+        # Update state based on perfect observations
+        self.x   = self.obs[self.state_idx]
 
         # Step the time
         self.t += self.dt
@@ -238,22 +299,26 @@ if __name__=='__main__':
     # Simulate one episode
     total_reward = 0.0
 
+    # Generate refference signal:
+    theta_ref = np.zeros(1000)
+
     # reset env
     done = False
     state = env.reset()
 
     while not done:
-
         # Actor:
         scaled_action = actor.select_action(np.array(state))
         action = env.scale_action(scaled_action)
+        action[0] = 10 * state[0]
         
-
         # Simulate one step in environment
         obs, reward, done, info = env.step(action.flatten())
         next_state = obs[env.state_idx]
 
-        print(f'de: {action[0]:.03}  q:{state[0]:.03f}  V:{state[1]:.03f}  alpha:{state[2]:.03f}  theta:{state[3]:.03f}')
+        print(f'de: {action[0]:.03}  q:{state[0]:.03f}  V:{state[1]:.03f}  alpha:{state[2]:.03f}  theta:{state[3]:.03f} ')
+        print(f'Reward: {reward:0.03f}')
+
         # Update
         total_reward += reward
         state = next_state
