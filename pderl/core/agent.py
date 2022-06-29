@@ -78,12 +78,12 @@ class Agent:
         """
         total_reward = 0.0
 
-        state = self.env.reset()
+        obs = self.env.reset()
         done = False
 
         while not done: 
             # select action
-            action = agent.actor.select_action(np.array(state))
+            action = agent.actor.select_action(np.array(obs))
 
             if is_action_noise:
                 clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
@@ -91,27 +91,28 @@ class Agent:
                 action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
-            next_state, reward, done, info = self.env.step(action.flatten())
+            next_obs, reward, done, info = self.env.step(action.flatten())
             total_reward += reward
 
             # Compute BCs:
-            bcs = self.env.get_bc
+            # TODO: add code
+            bcs = (0.,0.)
 
             # Add experiences to buffer:
             if store_transition:
-                transition = (state, action, next_state, reward, float(done))
+                transition = (obs, action, next_obs, reward, float(done))
                 self.num_frames += 1; self.gen_frames += 1
                 self.replay_buffer.add(*transition)
                 agent.buffer.add(*transition)
 
-            # update agent state
-            state = next_state
+            # update agent obs
+            obs = next_obs
 
         # updated games if is done
         if store_transition: 
             self.num_games += 1
 
-        return {'reward': total_reward, 'bcs': info['bcs']}
+        return {'reward': total_reward, 'bcs': bcs}
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
@@ -161,7 +162,6 @@ class Agent:
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
         # >>> loop over population AND store experiences
-
         t0 = time.time()
         for net in self.pop:   
             for _ in range(self.args.num_evals):
@@ -172,9 +172,7 @@ class Agent:
         rewards = dask.compute(*futures)
         rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
         rewards = np.mean(rewards, axis = 0)
-        
         # print(f"Dask - time for evaluation: {time.time()- t0 :.02f}s")
-
 
         # Validation test for NeuroEvolution 
         best_train_fitness  = np.max(rewards)  #  champion -- highest reward
@@ -232,9 +230,9 @@ class Agent:
             'pop_avg':     population_avg,
             'pop_min':     worst_train_fitness,
             'elite_index': elite_index,
-            'rl_reward':  rl_reward,
-            'rl_std':     rl_std,
-            'PG_obj':     np.mean(losses['PG_obj']),
+            'rl_reward':   rl_reward,
+            'rl_std':      rl_std,
+            'PG_obj':      np.mean(losses['PG_obj']),
             'TD_loss':     np.mean(losses['TD_loss']),
             'pop_novelty': 0.,
         }

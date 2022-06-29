@@ -6,48 +6,6 @@ import torch
 import os
 import torch.nn as nn
 
-class Tracker:
-    def __init__(self, parameters, vars_string, project_string):
-        self.vars_string = vars_string
-        self.project_string = project_string
-        self.foldername = parameters.save_foldername
-        self.all_tracker = [ [[],0.0,[]] for _ in vars_string] # [Id of var tracked][fitnesses, avg_fitness, csv_fitnesses]
-        self.counter = 0
-        self.conv_size = 10
-        if not os.path.exists(self.foldername):
-            os.makedirs(self.foldername)
-
-    def update(self, updates, generation):
-        """ Update the logger.
-        Args:
-            updates (list): Variables to add to logger.
-            generation (int): Counter (time passed/ frames/ games)
-        """
-        self.counter += 1
-        for update, var in zip(updates, self.all_tracker):
-            if update == None: continue
-            var[0].append(update)
-
-        # Constrain size of convolution
-        for var in self.all_tracker:
-            if len(var[0]) > self.conv_size: var[0].pop(0)
-
-        # Update new average
-        for var in self.all_tracker:
-            if len(var[0]) == 0: continue
-            var[1] = sum(var[0])/float(len(var[0]))
-
-        if self.counter:  # Save to csv file
-            for i, var in enumerate(self.all_tracker):
-                if len(var[0]) == 0: continue
-                var[2].append(np.array([generation, var[1]]))
-                filename = os.path.join(self.foldername, self.vars_string[i] + self.project_string)
-                try:
-                    np.savetxt(filename, np.array(var[2]), fmt='%.3f', delimiter=',')
-                except:
-                    # Common error showing up in the cluster for unknown reasons
-                    print('Failed to save progress')
-
 
 class Memory:   # stored as ( s, a, r, s_ ) in SumTree
     e = 0.01

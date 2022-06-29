@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('-should_log', help='Wether the WandB loggers are used', action='store_true')
 parser.add_argument('-run_name', default='test', type=str)
-parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2) (PHLab)',type=str, default='LunarLanderContinuous-v2')
+parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2) (PHLab)',type=str, default='PHlab_attitude')
 parser.add_argument('-use_ddpg', help='Wether to use DDPG or TD3 for the RL part. Defaults to TD3',action='store_true', default=False)
 parser.add_argument('-frames', help='Number of frames to learn from', default=num_frames, type=int)
 
@@ -49,8 +49,6 @@ parser.add_argument('-save_periodic', help='Save actor, critic and memory period
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
                     type=int, default=num_games//10)
 
-# ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 def save_agent (agent, parameters: object, elite_index: int = None):
     """ Save the trained agents.
@@ -67,18 +65,18 @@ def save_agent (agent, parameters: object, elite_index: int = None):
 
     # Save best performing agent separately:
     if elite_index is not None:
-        torch.save(agent.pop[elite_index].actor.state_dict(), os.path.join(parameters.save_foldername,
-                                                                           'elite_net.pkl'))
+        torch.save(agent.pop[elite_index].actor.state_dict(), 
+                    os.path.join(parameters.save_foldername,'elite_net.pkl'))
     print("Progress Saved")
 
 if __name__ == "__main__":
     cla = parser.parse_args()
+
     # Inject the cla arguments in the parameters object
     parameters = Parameters(cla)
 
     # Create Env
     env = envs.config.select_env(cla.env)
-
     parameters.action_dim = env.action_space.shape[0]
     parameters.state_dim = env.observation_space.shape[0]
 
@@ -133,8 +131,7 @@ if __name__ == "__main__":
               '\n')
 
         # Update loggers:
-        stats['frames'] = agent.num_frames
-        stats['games'] = agent.num_games
+        stats['frames'] = agent.num_frames; stats['games'] = agent.num_games
         stats['time'] = time.time() - start_time
         stats['elite_fraction'] = agent.evolver.selection_stats['elite'] / \
             agent.evolver.selection_stats['total']

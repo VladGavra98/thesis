@@ -1,10 +1,14 @@
+from distutils.command.config import config
+import envs.citation as citation
+from signals.stochastic_signals import RandomizedCosineStepSequence, Step
+import signals
+
 from abc import ABC, abstractmethod
 import gym
 from gym.spaces import Box
-import nacl
 import numpy as np
-import envs.citation as citation
 from typing import Tuple, List, Dict
+
 
 class BaseEnv(gym.Env, ABC):
     """ Base class to be able to write generic training & eval code
@@ -20,8 +24,9 @@ class BaseEnv(gym.Env, ABC):
     def observation_space(self) -> Box:
         raise NotImplementedError
 
+
     @abstractmethod
-    def get_reference(self) -> float:
+    def get_reference_value(self) -> float:
         raise NotImplementedError
 
     # todo: The controller state and error should be vectors
@@ -38,177 +43,280 @@ class BaseEnv(gym.Env, ABC):
     def get_reward(self) -> float:
         pass
 
-    def scale_action(self, action: np.ndarray) -> np.ndarray:
-        """Scale the actions from [-1, 1] to the appropriate scale of the action space."""
+    def unscale_action(self, action : np.ndarray) -> np.ndarray:
+        """
+        Rescale the action from [action_space.low, action_space.high] to [-1, 1]
+
+        Args:
+            action (mp.ndarray): Action in the physical limits
+
+        Returns:
+            np.ndarray: Action vector in the [-1,1] interval for learning tasks
+        """        
         low, high = self.action_space.low, self.action_space.high
-        action = low + 0.5 * (action + 1.0) * (high - low)
-        return action
+        return 2.0 * ((action - low) / (high - low)) - 1.0
+
+
+    def scale_action(self, scaled_action : np.ndarray) -> np.ndarray:
+        """ Scale the action from [-1, 1] to [action_space.low, action_space.high]. 
+        Might not be needed always since it depends on the activation of the output layer. 
+
+        Args:
+            scaled_action (mp.ndarray): _description_
+
+        Returns:
+            np.ndarray: action vector in the physical limits
+        """        
+        low, high = self.action_space.low, self.action_space.high
+        return low + 0.5 * (scaled_action + 1.0) * (high - low)
 
 
 class CitationEnv(BaseEnv):
     """ Example citation wrapper with p-control reward function. """
 
-    n_actions = 10
-    n_obs = 12
+    n_actions_full = 10
+    n_obs_full = 12
 
-    def __init__(self):
+    def __init__(self, configuration : str = None):
         self.t = 0
         self.dt = 0.01
-        self.t_max = 5.0   #5 sec episodes
+        self.t_max = 30.0   #5 sec episodes -- TOO SHORT
 
         # Have an internal storage of state [12]
-        # 0, 1, 2   -> p, q, r
-        # 3, 4, 5   -> V, alpha, beta
-        # 6, 7, 8   -> phi, theta, psi
-        # 9, 10, 11  -> he, xe, ye,
-        self.x: np.ndarray = None
+        # 0,  1, 2   -> p, q, r
+        # 3,  4, 5   -> V, alpha, beta
+        # 6,  7, 8   -> phi, theta, psi
+        # 9, 10, 11  -> he, xe, ye
+        self.obs: np.ndarray     = None    # observation vector
+        self.x: np.ndarray       = None      # controllable state vector (useful for configurations)
+        self.obs_idx:List[int] = None
 
         # Have an internal storage of last action [10]
+        # Inputs:
+        #   0 de      , 1 da      , 2 dr
+        #   3 trim de , 4 trim da , 5 trim dr
+        #   6 df      , 7 gear
+        #   8 throttle1 9 throttle2
+        self.n_actions : int    = None
         self.last_u: np.ndarray = None
+        self.control_idx: List[int] = None
+
+        # refference to track
+        self.ref: signals.BaseSignal = None
+        
+        # actuator bounds
+        self.rate_bound = np.deg2rad(20)    # 20 deg/s boudns
+        if 'symmetric'  in configuration.lower():
+            print('Symmetric control only.')
+            self.n_actions = 1   
+            self.obs_idx = [1,3,4]  # slicing for symmetric states --  q, V,alpha, theta
+            self.control_idx = [7]    # theta 
+
+        elif 'attitude' in configuration.lower():
+            print('Attitude control.')
+            self.n_actions = 3   
+            self.obs_idx = [0,1,2,3,4,8]  # all but no xe,ye
+            self.control_idx = [5,6,7]   # 6,  7, 8   -> beta, phi, theta
+
+        else:
+            print('Full state control.')
+            self.n_actions = 3
+            self.obs_idx = range(10)    # all states 
+                 
+
+        # observation space: aircraft state + actuator state + control states
+        self.n_obs : int = len(self.obs_idx) + self.n_actions + len(self.control_idx)
+
+        # error
+        self.error : np.ndarray = np.zeros((1,self.n_actions))
+
+        # reward stuff
+        self.cost = 6/np.pi                          # scaler
+        self.max_bound = np.ones(self.error.shape)   # bounds
 
     @property
     def action_space(self) -> Box:
         return Box(
-            low=-100 * np.ones(self.n_actions),
-            high=100 * np.ones(self.n_actions),
-            dtype=np.float64,
+            low   = -self.rate_bound * np.ones(self.n_actions),
+            high  = self.rate_bound * np.ones(self.n_actions),
+            dtype = np.float64,
         )
 
     @property
     def observation_space(self) -> Box:
         return Box(
-            low=-100 * np.ones(self.n_obs),
-            high=100 * np.ones(self.n_obs),
-            dtype=np.float64,
+            low   = -100 * np.ones(self.n_obs),
+            high  = 100 * np.ones(self.n_obs),
+            dtype = np.float64,
         )
 
-    # todo: make this a vector
-    def get_reference(self) -> float:
-        # For example a step reference (  have my own class to generate signals)
-        return 1.0 if self.t > 5.0 else 0.0
+    @property
+    def q(self) -> float:
+        return self.x[1]
+    @property
+    def V(self)-> float:
+        return self.x[3] 
+    @property
+    def alpha(self) -> float:
+        return self.x[4] 
+    @property
+    def beta(self) -> float:
+        return self.x[5]        
+    @property
+    def phi(self) -> float:
+        return self.x[6]
+    @property
+    def theta(self):
+        return self.x[7]
+    @property
+    def psi(self) -> float:
+        return self.x[8]
+    @property
+    def H(self)-> float:
+        return self.x[9] 
 
-    # todo: make this a vector
+    def init_ref(self):
+        if self.n_actions ==1:
+            ref =  RandomizedCosineStepSequence(
+                        t_max=self.t_max,
+                        ampl_max=25,
+                        block_width=9,
+                        smooth_width=3.0,
+                        n_levels=10,
+                        vary_timings=0.1)
+            self.ref = [ref]
+
+        elif self.n_actions == 3:
+            step_theta =  RandomizedCosineStepSequence(
+                        t_max=self.t_max,
+                        ampl_max=25,
+                        block_width=9,
+                        smooth_width=3.0,
+                        n_levels=10,
+                        vary_timings=0.1)
+            
+            step_phi =  RandomizedCosineStepSequence(
+                        t_max=self.t_max,
+                        ampl_max=25,
+                        block_width=9,
+                        smooth_width=3.0,
+                        n_levels=10,
+                        vary_timings=0.1)
+
+            step_beta = step_theta * 0.
+
+            self.ref = [step_beta,step_phi, step_theta]
+
+
+    def get_reference_value(self) -> float:
+        return np.array([ref_signal(self.t) for ref_signal in self.ref ])
+
     def get_controlled_state(self) -> float:
-        # for example let's control p:
-        return self.x[0]
+        if self.n_actions ==3:
+            return np.array([self.beta,  self.phi, self.theta])
+        else:
+            return np.array([self.theta])
 
-    # todo: make this a vector
     def get_error(self) -> float:
-        return self.get_reference() - self.get_controlled_state()
+        self.error[:self.n_actions] = self.get_reference_value() - self.get_controlled_state()
+
 
     def get_reward(self) -> float:
-        # todo: parameterize reward function:
-        return - 1000.0 * self.get_error()**2
+        # reward shapes
+        # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30)**2, max_bound), -max_bound))  # square function
+        # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30), max_bound), -max_bound))  # rational function
+        # reward_vec = - np.maximum(np.minimum(1 / (np.abs(self.error) * 10 + 1), max_bound),    - max_bound)  # abs. linear function
+        reward_vec = 1/3 * np.linalg.norm( np.clip( self.cost * self.error , -self.max_bound, self.max_bound), ord=1)
+
+        reward = -reward_vec.sum() / self.error.shape[0]
+        return reward
     
     def get_bcs(self) -> Tuple[float, float]:
         """ Return behavioural characteristic """
         return (0.,0.)
 
+
+    def check_envelope_bounbds():
+        raise NotImplementedError
+
     def reset(self, **kwargs) -> np.ndarray:
         # Reset time
         self.t = 0.0
 
-        # todo: Reset actuators (in case of incmrenetal control
-
-        # todo: If training -> randomize reference signal sequence
-
         # Initalize the simulink model
-        # todo: check if initialize() resets the citation to initial conditions! (if not we have to reimport terminate first?)
         # citation.terminate()
         citation.initialize()
 
-        # Make a zero input step to retreive the state
-        u = np.zeros(self.n_actions)
-        self.x = citation.step(u)
+        # Randomize reference signal sequence
+        self.init_ref()
+
+        # Make a full-zero input step to retreive the state
+        u = np.zeros(self.n_actions_full)
         self.last_u = u
 
-        return self.x
+        self.x = citation.step(u)
+        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u[:self.n_actions]), axis = 0)
+
+        return self.obs
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         """ Gym-like step function returns: (state, reward, done, info) 
 
         Args:
-            action (np.ndarray): Un-sclaled action to be taken.
+            action (np.ndarray): Un-sclaled action in the interval [-1,1] to be taken.
 
         Returns:
             Tuple[np.ndarray, float, bool, dict]: new_state, obtained reward, is_done mask, {refference signal value, behavioural characteristic}
         """        
+        is_done = False
+        
+        # pad action to correpond to the Simulink dimensions
+        action = np.clip(action, -1. , 1.)
+        scaled_action = self.scale_action(action)   # scaled to actuator limits i.e. -20,+20 deg/s
+        scaled_action = np.pad(scaled_action,
+                        (0, self.n_actions_full - self.n_actions), 
+                        'constant', constant_values = (0.))
 
-        # todo: clip the action vector between [-1, 1]
 
-        # Scale [1, 1] action to the action space
-        scaled_action = self.scale_action(action)
-        self.last_u = scaled_action
-
-        # todo: Implement incremental control: scaled_action is delta_u -> u += delta_u
+        # incremental control input: 
+        u = self.last_u + scaled_action * self.dt
+        self.last_u = u
 
         # Step the system
-        self.x = citation.step(scaled_action)
+        self.x = citation.step(u)
+        
+        # Reward
+        self.get_error()
+        reward   = self.get_reward()
+
+        # Update observation based on perfect observations & actuator state
+        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u[:self.n_actions]), axis = 0)
 
         # Step the time
-        self.t += self.dt
-
-        # Reward
-        reward = self.get_reward()
+        self.t  += self.dt
 
         # Done:
-        is_done = self.t >= self.t_max
-
-
+        if self.t >= self.t_max or np.abs(self.theta) > 45. or self.H < 100 or np.any(np.isnan(self.x)):
+            is_done = True
+   
         # info:
         info = {
-            "ref": self.get_reference(),
+            "ref": self.ref,
+            "x":   self.x,
+            "t":   self.t,
         }
 
-        return self.x, reward, is_done, info
+        return self.obs, reward, is_done, info
 
     def render(self, **kwargs):
         """ just to make the linter happy (we are deriving from gym.Env)"""
         pass
 
-    def simulate (self, actor : object,
-                render : bool = False) -> Dict[float, tuple]:
-        """ Wrapper function for the gym LunarLander enviornment. It can include the faulty cases:
-                -> broken main engine
-                -> faulty navigation snesors (i.e., nosiy position)
-
-        Args:
-            actor (object): Actor class that has the select_action() method
-            env (object): Environment with OpenAI Gym API (make(), reset(),step())
-            render (bool, optional): Should render the video env. Defaults to False.
-    
-        Returns:
-            tuple: Reward (float),
-        """
-        
-        total_reward = 0.0
-
-        # reset env
-        done = False
-        state = self.reset()
-
-        while not done:
-            if render:
-                self.render()
-
-            # Actor:
-            action = self.scale_action(actor.select_action(np.array(state)))
-
-            # Simulate one step in environment
-            next_state, reward, done, info = self.step(action.flatten())
-
-            # Update
-            total_reward += reward
-            state = next_state
-
-
-
-        return {'total_reward':total_reward}
-
     @staticmethod
     def finish():
         """ Terminate the simulink thing."""
         citation.terminate()
+
 
 class Actor():
     # NOTE for testing the environment implementation
@@ -217,30 +325,57 @@ class Actor():
         self.policy = np.random.rand(action_dim, state_dim,)
 
     def select_action(self,state):
-        return self.policy @ state
+        return (self.policy @ state)/100
+
 
 if __name__=='__main__':
     # NOTE for testing the environment implementation
-    env = CitationEnv()
-    actor = Actor( env.observation_space.shape[0], env.action_space.shape[0])
+    import config
 
+
+    env = config.select_env('phlab_symmetric')
+    actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
+    
     # Simulate one episode
     total_reward = 0.0
 
+    # Generate refference signal:
+    theta_ref = np.zeros(1000)
+
     # reset env
     done = False
-    state = env.reset()
+    obs = env.reset()
 
+    ref_beta, ref_theta, ref_phi = [], [], []
     while not done:
-
         # Actor:
-        action = env.scale_action(actor.select_action(np.array(state)))
-
+        scaled_action = actor.select_action(np.array(obs))
+        action = env.scale_action(scaled_action)
+        action[0] = 10 * env.q
+        
         # Simulate one step in environment
-        next_state, reward, done, info = env.step(action.flatten())
+        obs, reward, done, info = env.step(action.flatten())
+        next_obs = obs
+
+        print(f'de: {action[0]:.03}  q:{env.q:.03f}  V:{env.V:.03f}  alpha:{env.alpha:.03f}  theta:{env.theta:.03f}   H:{env.H:.03f}')
+        print(f'Reward: {reward:0.03f}')
+        print('Error:', env.error)
+
+
 
         # Update
         total_reward += reward
-        state = next_state
+        obs = next_obs
 
+
+        # save refs
+        # ref_beta.append(env.ref[0](env.t)); ref_theta.append(env.ref[2](env.t)); ref_phi.append(env.ref[1](env.t))
+
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(ref_theta, label = 'theta')
+    # plt.plot(ref_phi, label = 'phi')
+    # plt.plot(ref_beta, label = 'beta')
+    # plt.legend(loc = 'best')
+    # plt.show()
     env.finish()
