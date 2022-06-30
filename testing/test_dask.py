@@ -18,7 +18,8 @@ if __name__ == '__main__':
                                 columns=['param_a', 'param_b', 'param_c', 'param_d'])
 
 
-    results,lazy_results = [], []
+    results= []
+    lazy_results = {'1':[], '2':[]}
 
     # standard computation
     t0 = time.time()
@@ -38,9 +39,10 @@ if __name__ == '__main__':
     t0 = time.time()
     for parameters in input_params.values[:10]:
         lazy_result = dask.delayed(costly_simulation)(parameters)
-        lazy_results.append(lazy_result)
+        lazy_results['1'].append(lazy_result)
+        lazy_results['2'].append(0)
 
-    futures = dask.persist(*lazy_results) 
+    futures = dask.persist(*lazy_results['1']) 
     results = dask.compute(*futures)
 
     t2= time.time()

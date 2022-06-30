@@ -11,7 +11,7 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_games = 10
+num_games = 2000
 num_frames = num_games * 200
 
 # -store_true means that it becomes true if I mention the argument
@@ -129,15 +129,17 @@ if __name__ == "__main__":
               ' PG Objective:', '%.4f' % stats['PG_obj'],
               ' TD Loss:', '%.4f' % stats['TD_loss'],
               '\n')
+        
+        # check for nans:
 
         # Update loggers:
         stats['frames'] = agent.num_frames; stats['games'] = agent.num_games
         stats['time'] = time.time() - start_time
-        stats['elite_fraction'] = agent.evolver.selection_stats['elite'] / \
+        stats['rl_elite_fraction'] = agent.evolver.selection_stats['elite'] / \
             agent.evolver.selection_stats['total']
-        stats['selected_fraction'] = agent.evolver.selection_stats['selected'] / \
+        stats['rl_selected_fraction'] = agent.evolver.selection_stats['selected'] / \
             agent.evolver.selection_stats['total']
-        stats['discarded_fraction'] = agent.evolver.selection_stats['discarded'] / \
+        stats['rl_discarded_fraction'] = agent.evolver.selection_stats['discarded'] / \
             agent.evolver.selection_stats['total']
         
         if cla.should_log:

@@ -102,10 +102,11 @@ class CitationEnv(BaseEnv):
         self.control_idx: List[int] = None
 
         # refference to track
-        self.ref: signals.BaseSignal = None
+        self.ref: List[signals.BaseSignal] = None
         
         # actuator bounds
         self.rate_bound = np.deg2rad(20)    # 20 deg/s boudns
+
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1   
@@ -131,6 +132,7 @@ class CitationEnv(BaseEnv):
         self.error : np.ndarray = np.zeros((1,self.n_actions))
 
         # reward stuff
+        self.reward_scale = -1/3
         self.cost = 6/np.pi                          # scaler
         self.max_bound = np.ones(self.error.shape)   # bounds
 
@@ -189,7 +191,7 @@ class CitationEnv(BaseEnv):
         elif self.n_actions == 3:
             step_theta =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
-                        ampl_max=25,
+                        ampl_max=20,
                         block_width=9,
                         smooth_width=3.0,
                         n_levels=10,
@@ -217,6 +219,8 @@ class CitationEnv(BaseEnv):
         else:
             return np.array([self.theta])
 
+
+
     def get_error(self) -> float:
         self.error[:self.n_actions] = self.get_reference_value() - self.get_controlled_state()
 
@@ -226,9 +230,9 @@ class CitationEnv(BaseEnv):
         # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30)**2, max_bound), -max_bound))  # square function
         # reward_vec = np.abs(np.maximum(np.minimum(r2d(self.error / 30), max_bound), -max_bound))  # rational function
         # reward_vec = - np.maximum(np.minimum(1 / (np.abs(self.error) * 10 + 1), max_bound),    - max_bound)  # abs. linear function
-        reward_vec = 1/3 * np.linalg.norm( np.clip( self.cost * self.error , -self.max_bound, self.max_bound), ord=1)
+        reward_vec = self.reward_scale * np.linalg.norm(np.clip(self.cost * self.error , -self.max_bound, self.max_bound), ord=1)
 
-        reward = -reward_vec.sum() / self.error.shape[0]
+        reward = reward_vec.sum() / self.error.shape[0]
         return reward
     
     def get_bcs(self) -> Tuple[float, float]:
@@ -298,6 +302,7 @@ class CitationEnv(BaseEnv):
         # Done:
         if self.t >= self.t_max or np.abs(self.theta) > 45. or self.H < 100 or np.any(np.isnan(self.x)):
             is_done = True
+            reward += (self.t_max - self.t) * self.reward_scale
    
         # info:
         info = {
@@ -333,7 +338,7 @@ if __name__=='__main__':
     import config
 
 
-    env = config.select_env('phlab_symmetric')
+    env = config.select_env('phlab_attitude')
     actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
     
     # Simulate one episode
@@ -369,13 +374,13 @@ if __name__=='__main__':
 
 
         # save refs
-        # ref_beta.append(env.ref[0](env.t)); ref_theta.append(env.ref[2](env.t)); ref_phi.append(env.ref[1](env.t))
+        ref_beta.append(env.ref[0](env.t)); ref_theta.append(env.ref[2](env.t)); ref_phi.append(env.ref[1](env.t))
 
-    # import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
-    # plt.plot(ref_theta, label = 'theta')
-    # plt.plot(ref_phi, label = 'phi')
-    # plt.plot(ref_beta, label = 'beta')
-    # plt.legend(loc = 'best')
-    # plt.show()
+    plt.plot(ref_theta, label = 'theta')
+    plt.plot(ref_phi, label = 'phi')
+    plt.plot(ref_beta, label = 'beta')
+    plt.legend(loc = 'best')
+    plt.show()
     env.finish()

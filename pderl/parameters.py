@@ -46,7 +46,7 @@ class Parameters:
         self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 256
-        self.frac_frames_train = 1.0
+        self.frac_frames_train = 10/self.batch_size
         self.use_done_mask = True
         self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1

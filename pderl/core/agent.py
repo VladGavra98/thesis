@@ -5,11 +5,19 @@ from core import replay_memory
 from core import ddpg as ddpg
 from core import td3 as td3
 from core import replay_memory
+from core import genetic_agent, mod_utils
+from dataclasses import dataclass
 from parameters import Parameters
-from pderl.core import genetic_agent, mod_utils
-
 from tqdm import tqdm
 import dask
+from typing import List, Dict, Tuple
+
+@dataclass                                                                                                                                      
+class Episode: 
+    """ Episode output"""                                                                                                                     
+    reward: np.float64                                                                                                                             
+    bcs: Tuple[np.float64]                                                                                                                           
+    length: np.float64 
 
 
 class Agent:
@@ -112,7 +120,8 @@ class Agent:
         if store_transition: 
             self.num_games += 1
 
-        return {'reward': total_reward, 'bcs': bcs}
+        # return {'reward': total_reward, 'bcs': bcs, 'episode_len': info['t']}
+        return Episode(reward = reward, bcs = bcs, length = info['t'] )
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
@@ -141,8 +150,9 @@ class Agent:
         """
         print('Train RL agent ...')
         pgs_obj, TD_loss = [], []
-        if len(self.replay_buffer) > self.args.batch_size * 5:  # agent has seen some experiences already
-            for _ in tqdm(range(int(self.gen_frames))):
+        if len(self.replay_buffer) > self.args.batch_size * 5:  
+            # agent has seen some experiences already
+            for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
@@ -157,53 +167,58 @@ class Agent:
     def train(self):
         self.gen_frames = 0
         self.iterations += 1
-        results , test_scores, tests_rl = [],[],[]
+        rewards, bcs_lst, lengths = [], [], [] 
+        test_scores, tests_rl = [],[]
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
         # >>> loop over population AND store experiences
-        t0 = time.time()
         for net in self.pop:   
             for _ in range(self.args.num_evals):
-                episode = dask.delayed(self.evaluate)(net, is_action_noise=False)
-                results.append(episode['reward'])
+                episode = dask.delayed(self.evaluate)(net,is_action_noise=False)
+                rewards.append(episode.reward)
+                bcs_lst.append(episode.bcs)
+                lengths.append(episode.length)
 
-        futures = dask.persist(*results) 
-        rewards = dask.compute(*futures)
-        rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
+        futures = dask.persist(*rewards); rewards = dask.compute(*futures); rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
+        futures = dask.persist(*bcs_lst); bcs_lst = dask.compute(*futures); bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
+        futures = dask.persist(*lengths); lengths = dask.compute(*futures); 
+        # 
         rewards = np.mean(rewards, axis = 0)
-        # print(f"Dask - time for evaluation: {time.time()- t0 :.02f}s")
+        bcs     = np.mean(bcs_lst, axis = 0)
+        avg_len = np.mean(lengths)
 
         # Validation test for NeuroEvolution 
-        best_train_fitness  = np.max(rewards)  #  champion -- highest reward
+        best_train_fitness  = np.max(rewards)     #  champion -- highest reward
         worst_train_fitness = np.min(rewards)
-        population_avg      = np.average(rewards)    #  population_avg -- average over the entire agent population
+        population_avg      = np.average(rewards) # population_avg 
         champion            = self.pop[np.argmax(rewards)]
 
-        # Evaluate the champion
+        # Evaluate the champion -- do NOT  store these trials
         for _ in range(self.validation_tests):
-            episode = self.evaluate(champion, is_action_noise=False, store_transition=False) # do NOT  store these trials
-            test_scores.append(episode['reward'])
-        futures = dask.persist(*test_scores) 
-        test_scores = dask.compute(*futures)
+            episode = self.evaluate(champion,is_action_noise=False,store_transition=False) 
+            test_scores.append(episode.reward)
+        futures = dask.persist(*test_scores); test_scores = dask.compute(*futures); 
         test_score = np.average(test_scores); test_sd = np.std(test_scores)
+
+        if np.isnan(test_score): test_score = -1000.
+        if np.isnan(test_sd): test_sd = 100.
 
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, rewards)
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3)    +++++++++++++++++++++++++++++++++++++++++++'''
-        # Collect experience for training
+        # Collect experience for training -- No dask needed
         self.evaluate(self.rl_agent, is_action_noise=True)
 
         # Gradient update
         losses = self.train_rl()
 
-        # Validation test for RL agent
+        # Validation test for RL agent -- do NOT  store these trials
         for _ in range(self.validation_tests):
-            rl_stats = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)   # do NOT  store these trials
-            tests_rl.append(rl_stats['reward'])
-        futures = dask.persist(*tests_rl) 
-        tests_rl = dask.compute(*futures)
+            rl_episode = self.evaluate(self.rl_agent, store_transition=False, is_action_noise=False)   
+            tests_rl.append(rl_episode.reward)
+        futures = dask.persist(*tests_rl); tests_rl = dask.compute(*futures);
         rl_reward = np.average(tests_rl); rl_std = np.std(tests_rl)
 
 
@@ -232,6 +247,7 @@ class Agent:
             'elite_index': elite_index,
             'rl_reward':   rl_reward,
             'rl_std':      rl_std,
+            'avg_ep_len':  avg_len, 
             'PG_obj':      np.mean(losses['PG_obj']),
             'TD_loss':     np.mean(losses['TD_loss']),
             'pop_novelty': 0.,
