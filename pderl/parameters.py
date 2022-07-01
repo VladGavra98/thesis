@@ -46,7 +46,7 @@ class Parameters:
         self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 256
-        self.frac_frames_train = 10/self.batch_size
+        self.frac_frames_train = 0.75
         self.use_done_mask = True
         self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1
@@ -101,7 +101,7 @@ class Parameters:
         self.test_operators = cla.test_operators
 
         # Save Results
-        self.state_dim = None  # To be initialised externally
+        self.state_dim = None   # To be initialised externally
         self.action_dim = None  # To be initialised externally
         self.save_foldername = './logs/tmp/'
 

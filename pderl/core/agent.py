@@ -18,6 +18,7 @@ class Episode:
     reward: np.float64                                                                                                                             
     bcs: Tuple[np.float64]                                                                                                                           
     length: np.float64 
+    state_history: List
 
 
 class Agent:
@@ -84,7 +85,7 @@ class Agent:
         Returns:
             tuple: Reward, temporal difference error
         """
-        total_reward = 0.0
+        rewards, state_lst = [],[]
 
         obs = self.env.reset()
         done = False
@@ -100,7 +101,8 @@ class Agent:
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
-            total_reward += reward
+            rewards.append(reward)
+            state_lst.append(self.env.x)
 
             # Compute BCs:
             # TODO: add code
@@ -121,7 +123,7 @@ class Agent:
             self.num_games += 1
 
         # return {'reward': total_reward, 'bcs': bcs, 'episode_len': info['t']}
-        return Episode(reward = reward, bcs = bcs, length = info['t'] )
+        return Episode(reward = sum(rewards), bcs = bcs, length = info['t'], state_history=state_lst)
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):

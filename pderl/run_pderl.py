@@ -11,8 +11,8 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_games = 2000
-num_frames = num_games * 200
+num_games = 200
+num_frames = num_games * 2500
 
 # -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
@@ -69,6 +69,7 @@ def save_agent (agent, parameters: object, elite_index: int = None):
                     os.path.join(parameters.save_foldername,'elite_net.pkl'))
     print("Progress Saved")
 
+
 if __name__ == "__main__":
     cla = parser.parse_args()
 
@@ -118,19 +119,21 @@ if __name__ == "__main__":
         # evaluate over all games
         stats = agent.train()
 
-        print('#Games:', agent.num_games, '#Frames:', agent.num_frames,
+        print('Games:', agent.num_games, 'Frames:', agent.num_frames,
               ' Train Max:', '%.2f' % stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
               ' Test Max:', '%.2f' % stats['test_score'] if stats['test_score'] is not None else None,
               ' Test SD:', '%.2f' % stats['test_sd'] if stats['test_sd'] is not None else None,
               ' Population Avg:', '%.2f' % stats['pop_avg'],
               ' Weakest :', '%.2f' % stats['pop_min'],
               '\n',
+              ' Avg. ep. len:', '%.2fs' % stats['avg_ep_len'],
               ' RL Reward:', '%.2f' % stats['rl_reward'],
               ' PG Objective:', '%.4f' % stats['PG_obj'],
               ' TD Loss:', '%.4f' % stats['TD_loss'],
               '\n')
-        
-        # check for nans:
+
+
+
 
         # Update loggers:
         stats['frames'] = agent.num_frames; stats['games'] = agent.num_games

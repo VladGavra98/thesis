@@ -1,6 +1,7 @@
 from distutils.command.config import config
+
 import envs.citation as citation
-from signals.stochastic_signals import RandomizedCosineStepSequence, Step
+from signals.stochastic_signals import RandomizedCosineStepSequence
 import signals
 
 from abc import ABC, abstractmethod
@@ -80,7 +81,7 @@ class CitationEnv(BaseEnv):
     def __init__(self, configuration : str = None):
         self.t = 0
         self.dt = 0.01      # [s]
-        self.t_max = 30.0   # [s]
+        self.t_max = 20.0   # [s]
 
         # Have an internal storage of state [12]
         # 0,  1, 2   -> p, q, r
@@ -120,8 +121,8 @@ class CitationEnv(BaseEnv):
             self.n_actions = 3
             self.obs_idx = range(10)            # all states         
 
-        # observation space: aircraft state + actuator state + control states
-        self.n_obs : int = len(self.obs_idx) + 2* self.n_actions 
+        # observation space: aircraft state + actuator state + control states (equal to actuator states)
+        self.n_obs : int = len(self.obs_idx) + 2 * self.n_actions 
 
         # error
         self.error : np.ndarray = np.zeros((self.n_actions))
@@ -191,8 +192,8 @@ class CitationEnv(BaseEnv):
         if self.n_actions ==1:
             ref =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
-                        ampl_max=25,
-                        block_width=9,
+                        ampl_max=20,
+                        block_width=4,
                         smooth_width=3.0,
                         n_levels=10,
                         vary_timings=0.1)
@@ -201,19 +202,19 @@ class CitationEnv(BaseEnv):
         elif self.n_actions == 3:
             step_theta =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
-                        ampl_max=25,
-                        block_width=9,
+                        ampl_max=20,
+                        block_width=4.0,
                         smooth_width=3.0,
                         n_levels=10,
-                        vary_timings=0.1)
+                        vary_timings=0.04)
             
             step_phi =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
-                        ampl_max=25,
-                        block_width=9,
+                        ampl_max=30,
+                        block_width=4.0,
                         smooth_width=3.0,
                         n_levels=10,
-                        vary_timings=0.1)
+                        vary_timings=0.04)
 
             step_beta = step_theta * 0.
 
@@ -240,10 +241,9 @@ class CitationEnv(BaseEnv):
     def filter_action(self, action : np.ndarray, tau : float = 0.5) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
-
         # w_0 = 2 * 2 * np.pi  # rad/s
         # u = self.last_u / (1 + w_0 * self.dt) + action * (w_0 * self.dt) / (1 + w_0 * self.dt)
-        return (1- tau) * self.last_u + tau * action * self.dt
+        return (1 - tau) * self.last_u + tau * action * self.dt
 
     def check_envelope_bounds():
         raise NotImplementedError
@@ -285,7 +285,7 @@ class CitationEnv(BaseEnv):
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action)
+        u = self.filter_action(action, tau = 1)
         self.last_u = u
 
         # Step the system
@@ -305,7 +305,7 @@ class CitationEnv(BaseEnv):
         # Check if Done:
         if self.t >= self.t_max or np.abs(self.theta) > 45. or self.H < 200 or np.any(np.isnan(self.x)):
             is_done = True
-            reward += (self.t_max - self.t) * self.reward_scale  # negative reward for dying soon
+            reward += (self.t_max - self.t) * self.reward_scale  # max. negative reward for dying soon
    
         # info:
         info = {
@@ -337,27 +337,21 @@ class Actor():
         return (self.policy @ state)/100
 
 
-if __name__=='__main__':
-    # NOTE for testing the environment implementation
-    import config
-
-    env = config.select_env('phlab_attitude')
-    actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
-    
-    # Simulate one episode
-    total_reward = 0.0
+def evaluate(verbose : bool = False):
+    """ Simulate one episode """
 
     # reset env
     done = False
     obs = env.reset()
 
+
+    # PID gains
+    p, i, d = 10, 5, 2
+    
     ref_beta, ref_theta, ref_phi = [], [], []
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
     error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
      
-    # PID gains
-    p, i, d = 10, 5, 2
-
     while not done :
         # PID actor:
         action = -(p * env.error + i * error_int + d * error_dev)
@@ -368,8 +362,9 @@ if __name__=='__main__':
         obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
 
-        print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
-        print(f'Error: {env.error} Reward: {reward:0.03f} \n \n')
+        if verbose:
+            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
+            print(f'Error: {env.error} Reward: {reward:0.03f} \n \n')
  
         # Update
         obs = next_obs
@@ -383,7 +378,25 @@ if __name__=='__main__':
         nz_lst.append(env.nz)
         ref_beta.append(env.ref[2](env.t)); ref_theta.append(env.ref[0](env.t)); ref_phi.append(env.ref[1](env.t))
 
-    print('Fitness: ', sum(rewards))
+    return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
+
+if __name__=='__main__':
+    # NOTE for testing the environment implementation
+    import config
+    from tqdm import tqdm
+
+    # init env an actor
+    env = config.select_env('phlab_attitude')
+    actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
+    
+    verbose = False
+    trials = 100
+    fitness_lst =[]
+    for _ in tqdm(range(trials)):
+        ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)
+        fitness_lst.append(sum(rewards))
+
+    print('Fitness: ', np.mean(fitness_lst), 'SD:', np.std(fitness_lst))
 
     # Plotting:
     import matplotlib.pyplot as plt
