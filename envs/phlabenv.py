@@ -182,6 +182,11 @@ class CitationEnv(BaseEnv):
     def H(self)-> float:
         return self.x[9] 
 
+    @property
+    def nz(self) -> float:
+        """ Load factor [g] """
+        return 1 + self.V * self.q/ 9.80665 
+
     def init_ref(self):
         if self.n_actions ==1:
             ref =  RandomizedCosineStepSequence(
@@ -347,14 +352,14 @@ if __name__=='__main__':
     obs = env.reset()
 
     ref_beta, ref_theta, ref_phi = [], [], []
-    x_lst, rewards,u_lst = [],[], []
+    x_lst, rewards,u_lst, nz_lst = [],[], [], []
     error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
      
     # PID gains
     p, i, d = 10, 5, 2
 
     while not done :
-        # Actor:
+        # PID actor:
         action = -(p * env.error + i * error_int + d * error_dev)
         action[-1]*=-1.5  # rudder needs some scaling
         error_dev  = env.error
@@ -375,9 +380,11 @@ if __name__=='__main__':
         rewards.append(reward)
         x_lst.append(env.x)
         u_lst.append(env.last_u)
+        nz_lst.append(env.nz)
         ref_beta.append(env.ref[2](env.t)); ref_theta.append(env.ref[0](env.t)); ref_phi.append(env.ref[1](env.t))
 
     print('Fitness: ', sum(rewards))
+
     # Plotting:
     import matplotlib.pyplot as plt
     x_lst = np.asarray(x_lst); u_lst = np.asarray(u_lst)
@@ -402,6 +409,8 @@ if __name__=='__main__':
     axs[0,1].plot(time,u_lst[:,0], linestyle = '--',label = 'de')
     axs[1,1].plot(time,u_lst[:,1], linestyle = '--',label = 'da')
     axs[2,1].plot(time,u_lst[:,2], linestyle = '--',label = 'dr')
+    axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
+
     fig2, ax_reward = plt.subplots()
     ax_reward.plot(time,rewards)
     ax_reward.set_ylabel('Reward [-]')
