@@ -114,7 +114,7 @@ class CitationEnv(BaseEnv):
         elif 'attitude' in configuration.lower():
             print('Attitude control.')
             self.n_actions = 3                  # de, da, dr
-            self.obs_idx = [0,1,2,3,4,8]        # all but no xe,ye
+            self.obs_idx = [0,1,2]        # all but no xe,ye
 
         else:
             print('Full state control.')
@@ -206,7 +206,7 @@ class CitationEnv(BaseEnv):
                         block_width=4.0,
                         smooth_width=3.0,
                         n_levels=10,
-                        vary_timings=0.04)
+                        vary_timings=0.04)  
             
             step_phi =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
@@ -255,9 +255,6 @@ class CitationEnv(BaseEnv):
         # Initalize the simulink model
         citation.initialize()
 
-        # Randomize reference signal sequence
-        self.init_ref()
-
         # Make a full-zero input step to retreive the state
         self.last_u = np.zeros(self.action_space.shape[0])
 
@@ -265,6 +262,11 @@ class CitationEnv(BaseEnv):
         _input = np.pad(self.last_u,(0, self.n_actions_full - self.n_actions), 
                         'constant', constant_values = (0.))
         self.x = citation.step(_input)
+
+        # Randomize reference signal sequence
+        self.init_ref()
+
+        # Build observation
         self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
 
         return self.obs
@@ -345,34 +347,41 @@ def evaluate(verbose : bool = False):
 
 
     # PID gains
-    p, i, d = 10, 5, 2
+    p, i, d = 12, 5, 2
     
     ref_beta, ref_theta, ref_phi = [], [], []
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
     error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
-     
-    while not done :
+    
+    print(env.observation_space.shape[0])
+    while not done and env.t < 0.1 :
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
         action[-1]*=-1.5  # rudder needs some scaling
         error_dev  = obs[:env.n_actions]
 
+        if verbose:
+            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
+            
+
         # Simulate one step in environment
+        print('Obs:', obs)
+        action = np.clip(action,-1,1)
         obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
 
         if verbose:
-            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
             print(f'Error: {obs[:env.n_actions]} Reward: {reward:0.03f} \n \n')
 
         assert obs[3] == env.p
         assert obs[4] == env.q
         assert obs[5] == env.r
+        assert np.isclose(env.error, obs[:env.n_actions]).all()
  
         # Update
         obs = next_obs
         error_int += obs[:env.n_actions]*env.dt
-        error_dev = (error_dev - obs[:env.n_actions])/env.dt
+        error_dev = ( obs[:env.n_actions]- error_dev)/env.dt
 
         # save 
         rewards.append(reward)
@@ -392,8 +401,9 @@ if __name__=='__main__':
     env = config.select_env('phlab_attitude')
     actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
     
-    verbose = False
-    trials = 10
+    
+    trials = 1
+    verbose = True if trials == 1  else  False
     fitness_lst =[]
     for _ in tqdm(range(trials)):
         ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)
@@ -404,7 +414,7 @@ if __name__=='__main__':
     # Plotting:
     import matplotlib.pyplot as plt
     x_lst = np.asarray(x_lst); u_lst = np.asarray(u_lst)
-    time = np.arange(0., env.t -env.dt, env.dt)
+    time = np.arange(0., env.t , env.dt)
 
     fig, axs = plt.subplots(4,2)
     axs[0,0].plot(time,ref_theta, linestyle = '--',label = 'ref_theta')
