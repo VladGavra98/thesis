@@ -11,8 +11,8 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_games = 200
-num_frames = num_games * 2500
+num_episodes = 200
+num_frames = num_episodes * 2000
 
 # -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
@@ -47,7 +47,7 @@ parser.add_argument('-test_operators', help='Test the variational operators', ac
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
-                    type=int, default=num_games//10)
+                    type=int, default=num_episodes//10)
 
 
 def save_agent (agent, parameters: object, elite_index: int = None):
@@ -57,6 +57,7 @@ def save_agent (agent, parameters: object, elite_index: int = None):
         parameters (_type_): Container class of the trainign hyperparameters.
         elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
     """
+    #TODO: move this to agent class
     actors_dict = {}
     for i, ind in enumerate(agent.pop):
         actors_dict[f'actor_{i}'] = ind.actor.state_dict()
@@ -67,6 +68,12 @@ def save_agent (agent, parameters: object, elite_index: int = None):
     if elite_index is not None:
         torch.save(agent.pop[elite_index].actor.state_dict(), 
                     os.path.join(parameters.save_foldername,'elite_net.pkl'))
+    
+    # save state history of the champion
+    filename = 'statehistory_episode' + str(agent.num_episodes) + '.txt'
+    np.savetxt(os.path.join(parameters.save_foldername,filename),
+        agent.champion_state_history, header = str(agent.num_episodes))
+    print('State hitostory saved to ' + str(filename))
     print("Progress Saved")
 
 
@@ -116,10 +123,10 @@ if __name__ == "__main__":
     
     while agent.num_frames <= parameters.num_frames:
 
-        # evaluate over all games
+        # evaluate over all episodes
         stats = agent.train()
 
-        print('Games:', agent.num_games, 'Frames:', agent.num_frames,
+        print('Epsiodes:', agent.num_episodes, 'Frames:', agent.num_frames,
               ' Train Max:', '%.2f' % stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
               ' Test Max:', '%.2f' % stats['test_score'] if stats['test_score'] is not None else None,
               ' Test SD:', '%.2f' % stats['test_sd'] if stats['test_sd'] is not None else None,
@@ -133,10 +140,8 @@ if __name__ == "__main__":
               '\n')
 
 
-
-
         # Update loggers:
-        stats['frames'] = agent.num_frames; stats['games'] = agent.num_games
+        stats['frames'] = agent.num_frames; stats['episodes'] = agent.num_episodes
         stats['time'] = time.time() - start_time
         stats['rl_elite_fraction'] = agent.evolver.selection_stats['elite'] / \
             agent.evolver.selection_stats['total']
@@ -146,13 +151,13 @@ if __name__ == "__main__":
             agent.evolver.selection_stats['total']
         
         if cla.should_log:
-            wandb.log(stats)  # main call to wandb logger
+            wandb.log(stats)                # main call to wandb logger
 
         # Get index of best actor
         elite_index = stats['elite_index']  # champion index
 
         # Save Policy
-        if cla.should_log and agent.num_games > next_save:
+        if cla.should_log and agent.num_episodes > next_save:
             next_save += parameters.next_save
             save_agent(agent, parameters, elite_index)
 

@@ -53,7 +53,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 128
+        self.hidden_size = 64  # NOTE  has been changed from 128
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -65,7 +65,7 @@ class Parameters:
 
         # ==================================    TD3 Params  =============================================
         self.policy_update_freq = 2    # minimum for TD3
-        self.noise_clip         = 0.5  # default
+        self.noise_clip         = 0.5  # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
 
@@ -79,7 +79,7 @@ class Parameters:
         self.elite_fraction = 0.2
  
         # Number of actors in the population
-        self.pop_size = 30
+        self.pop_size = 10
 
         # Mutation and crossover
         self.crossover_prob = 0.0

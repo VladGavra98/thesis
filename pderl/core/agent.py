@@ -68,8 +68,9 @@ class Agent:
         self.step = 1
 
         # Trackers
-        self.num_games = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
+        self.num_episodes = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
         self.rl_iteration = 0 # for TD3 delyed policy updates
+        self.champion_state_history : np.ndarray = None
 
 
     def evaluate (self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
@@ -99,10 +100,12 @@ class Agent:
                 action += clipped_noise
                 action = np.clip(action, -1.0, 1.0)
 
+
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
             rewards.append(reward)
             state_lst.append(self.env.x)
+
 
             # Compute BCs:
             # TODO: add code
@@ -118,9 +121,9 @@ class Agent:
             # update agent obs
             obs = next_obs
 
-        # updated games if is done
+        # updated episodes if is done
         if store_transition: 
-            self.num_games += 1
+            self.num_episodes += 1
 
         # return {'reward': total_reward, 'bcs': bcs, 'episode_len': info['t']}
         return Episode(reward = sum(rewards), bcs = bcs, length = info['t'], state_history=state_lst)
@@ -181,12 +184,11 @@ class Agent:
                 rewards.append(episode.reward)
                 bcs_lst.append(episode.bcs)
                 lengths.append(episode.length)
-
         futures = dask.persist(*rewards); rewards = dask.compute(*futures); rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
         futures = dask.persist(*bcs_lst); bcs_lst = dask.compute(*futures); bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
         futures = dask.persist(*lengths); lengths = dask.compute(*futures); 
-        # 
-        rewards = np.mean(rewards, axis = 0)
+        # take average stats
+        rewards = np.mean(rewards, axis = 0) 
         bcs     = np.mean(bcs_lst, axis = 0)
         avg_len = np.mean(lengths)
 
@@ -200,11 +202,14 @@ class Agent:
         for _ in range(self.validation_tests):
             episode = self.evaluate(champion,is_action_noise=False,store_transition=False) 
             test_scores.append(episode.reward)
+        
         futures = dask.persist(*test_scores); test_scores = dask.compute(*futures); 
+        futures = dask.persist(*episode.state_history); self.champion_state_history = dask.compute(*futures);
         test_score = np.average(test_scores); test_sd = np.std(test_scores)
 
         if np.isnan(test_score): test_score = -1000.
         if np.isnan(test_sd): test_sd = 100.
+
 
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, rewards)

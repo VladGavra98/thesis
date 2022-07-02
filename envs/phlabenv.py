@@ -234,11 +234,11 @@ class CitationEnv(BaseEnv):
 
     def get_reward(self) -> float:
         self.calc_error()
-        reward_vec = self.reward_scale * np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
-        reward     = reward_vec.sum() / self.error.shape[0]
+        reward_vec =  np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
+        reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
         return reward
     
-    def filter_action(self, action : np.ndarray, tau : float = 0.5) -> np.ndarray:
+    def filter_action(self, action : np.ndarray, tau : float = 1) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
         # w_0 = 2 * 2 * np.pi  # rad/s
@@ -265,7 +265,7 @@ class CitationEnv(BaseEnv):
         _input = np.pad(self.last_u,(0, self.n_actions_full - self.n_actions), 
                         'constant', constant_values = (0.))
         self.x = citation.step(_input)
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u[:self.n_actions]), axis = 0)
+        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
 
         return self.obs
 
@@ -276,12 +276,11 @@ class CitationEnv(BaseEnv):
             action (np.ndarray): Un-sclaled action in the interval [-1,1] to be taken.
 
         Returns:
-            Tuple[np.ndarray, float, bool, dict]: new_state, obtained reward, is_done mask, {refference signal value, behavioural characteristic}
+            Tuple[np.ndarray, float, bool, dict]: new_state, obtained reward, is_done mask, {refference signal value, time, state}
         """        
         is_done = False
-        
+
         # pad action to correpond to the Simulink dimensions
-        action = np.clip(action, -1. , 1.)
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
@@ -293,11 +292,11 @@ class CitationEnv(BaseEnv):
                                 'constant', constant_values = (0.))
         self.x = citation.step(citation_input)
         
-        # Reward
+        # Reward using clipped error
         reward   = self.get_reward()
 
         # Update observation based on perfect observations & actuator state
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u[:self.n_actions]), axis = 0)
+        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
 
         # Step time
         self.t  += self.dt
@@ -354,9 +353,9 @@ def evaluate(verbose : bool = False):
      
     while not done :
         # PID actor:
-        action = -(p * env.error + i * error_int + d * error_dev)
+        action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
         action[-1]*=-1.5  # rudder needs some scaling
-        error_dev  = env.error
+        error_dev  = obs[:env.n_actions]
 
         # Simulate one step in environment
         obs, reward, done, info = env.step(action.flatten())
@@ -364,12 +363,16 @@ def evaluate(verbose : bool = False):
 
         if verbose:
             print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
-            print(f'Error: {env.error} Reward: {reward:0.03f} \n \n')
+            print(f'Error: {obs[:env.n_actions]} Reward: {reward:0.03f} \n \n')
+
+        assert obs[3] == env.p
+        assert obs[4] == env.q
+        assert obs[5] == env.r
  
         # Update
         obs = next_obs
-        error_int += env.error*env.dt
-        error_dev = (error_dev - env.error)/env.dt
+        error_int += obs[:env.n_actions]*env.dt
+        error_dev = (error_dev - obs[:env.n_actions])/env.dt
 
         # save 
         rewards.append(reward)
@@ -390,7 +393,7 @@ if __name__=='__main__':
     actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
     
     verbose = False
-    trials = 100
+    trials = 10
     fitness_lst =[]
     for _ in tqdm(range(trials)):
         ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)
@@ -423,13 +426,14 @@ if __name__=='__main__':
     axs[1,1].plot(time,u_lst[:,1], linestyle = '--',label = 'da')
     axs[2,1].plot(time,u_lst[:,2], linestyle = '--',label = 'dr')
     axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
-
+  
     fig2, ax_reward = plt.subplots()
     ax_reward.plot(time,rewards)
     ax_reward.set_ylabel('Reward [-]')
     for i in range(4):
-        axs[i,0].set_xlabel('Time [s]')
-        axs[i,0].legend(loc = 'best')
+        for j in range(2):
+            axs[i,j].set_xlabel('Time [s]')
+            axs[i,j].legend(loc = 'best')
     
     plt.tight_layout()
     plt.show()
