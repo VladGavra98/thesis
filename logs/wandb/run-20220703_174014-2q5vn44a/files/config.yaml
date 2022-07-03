@@ -14,18 +14,13 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.8.10
-    start_time: 1656781769
+    start_time: 1656862814
     t:
       1:
       - 1
       - 54
       - 55
-      2:
-      - 1
-      - 54
-      - 55
       3:
-      - 2
       - 13
       - 16
       4: 3.8.10
@@ -67,7 +62,7 @@ env_name:
   value: PHlab_attitude
 frac_frames_train:
   desc: null
-  value: 0.75
+  value: 0.01
 gamma:
   desc: null
   value: 0.98
@@ -91,7 +86,7 @@ mutation_prob:
   value: 0.9
 next_save:
   desc: null
-  value: 20
+  value: 40
 noise_clip:
   desc: null
   value: 0.5
@@ -109,7 +104,7 @@ num_evals:
   value: 3
 num_frames:
   desc: null
-  value: 400000
+  value: 800000
 opstat:
   desc: null
   value: false
@@ -136,10 +131,10 @@ rl_to_ea_synch_period:
   value: 1
 run_name:
   desc: null
-  value: proper_obs_space
+  value: test
 save_foldername:
   desc: null
-  value: ../logs/wandb/run-20220702_190929-19vsn4rx/files
+  value: ../logs/wandb/run-20220703_174014-2q5vn44a/files
 save_periodic:
   desc: null
   value: false

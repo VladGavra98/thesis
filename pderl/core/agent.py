@@ -1,6 +1,8 @@
+import os
 import time
 from weakref import ref
 import numpy as np
+import torch
 from core import mod_neuro_evo as utils_ne
 from core import replay_memory
 from core import ddpg as ddpg
@@ -98,10 +100,13 @@ class Agent:
             # select action
             action = agent.actor.select_action(np.array(obs))
 
+            # add exploratory noise
             if is_action_noise:
                 clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
                 action += clipped_noise
-                action = np.clip(action, -1.0, 1.0)
+
+            # clip action
+            action = np.clip(action, -1.0, 1.0)
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
@@ -130,7 +135,6 @@ class Agent:
         if store_transition: 
             self.num_episodes += 1
 
-        # return {'reward': total_reward, 'bcs': bcs, 'episode_len': info['t']}
         return Episode(reward = sum(rewards), bcs = bcs, length = info['t'],\
                          state_history=state_lst, ref_signals=info['ref'], actions = action_lst)
 
@@ -175,6 +179,21 @@ class Agent:
 
         return {'PG_obj': pgs_obj, 'TD_loss': TD_loss}
 
+    def get_champion_eval(self, test_scores, champion):
+        # Evaluate the champion -- do NOT  store these trials
+        for _ in range(self.validation_tests):
+            episode = self.evaluate(champion,is_action_noise=False,store_transition=False) 
+            test_scores.append(episode.reward)
+
+        time = np.linspace(0, episode.length, len(episode.state_history))
+        ref_values = np.array([[ref(t_i) for t_i in time] for ref in episode.ref_signals]).transpose()
+        self.champion_history = np.concatenate((ref_values, episode.actions,episode.state_history), axis = 1)
+        test_score = np.average(test_scores); test_sd = np.std(test_scores)
+
+        if np.isnan(test_score): test_score = -1000.
+        if np.isnan(test_sd): test_sd = 100.
+        return test_score,test_sd
+
     def train(self):
         self.gen_frames = 0
         self.iterations += 1
@@ -206,7 +225,6 @@ class Agent:
         champion            = self.pop[np.argmax(rewards)]
 
         test_score, test_sd = self.get_champion_eval(test_scores, champion)
-
 
         # NeuroEvolution's probabilistic selection and recombination step
         elite_index = self.evolver.epoch(self.pop, rewards)
@@ -257,22 +275,34 @@ class Agent:
             'pop_novelty': 0.,
         }
 
-    def get_champion_eval(self, test_scores, champion):
-        # Evaluate the champion -- do NOT  store these trials
-        for _ in range(self.validation_tests):
-            episode = self.evaluate(champion,is_action_noise=False,store_transition=False) 
-            test_scores.append(episode.reward)
-
-        time = np.linspace(0, episode.length, len(episode.state_history))
-        ref_values = np.array([[ref(t_i) for t_i in time] for ref in episode.ref_signals]).transpose()
-        self.champion_history = np.concatenate((ref_values, episode.actions,episode.state_history), axis = 1)
-        test_score = np.average(test_scores); test_sd = np.std(test_scores)
-
-        if np.isnan(test_score): test_score = -1000.
-        if np.isnan(test_sd): test_sd = 100.
-        return test_score,test_sd
 
 
+
+    def save_agent (self, parameters: object, elite_index: int = None):
+        """ Save the trained agents.
+
+        Args:
+            parameters (_type_): Container class of the trainign hyperparameters.
+            elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
+        """
+        #TODO: move this to agent class
+        actors_dict = {}
+        for i, ind in enumerate(self.pop):
+            actors_dict[f'actor_{i}'] = ind.actor.state_dict()
+        torch.save(actors_dict, os.path.join(
+            parameters.save_foldername, 'evo_nets.pkl'))
+
+        # Save best performing agent separately:
+        if elite_index is not None:
+            torch.save(self.pop[elite_index].actor.state_dict(), 
+                        os.path.join(parameters.save_foldername,'elite_net.pkl'))
+        
+        # save state history of the champion
+        filename = 'statehistory_episode' + str(self.num_episodes) + '.txt'
+        np.savetxt(os.path.join(parameters.save_foldername,filename),
+            self.champion_history, header = str(self.num_episodes))
+        print('State hitostory saved to ' + str(filename))
+        print("Progress Saved")
 
 
 # class Archive:

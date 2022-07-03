@@ -8,7 +8,7 @@ import os
 style = 'seaborn-darkgrid'
 plt.style.use(style.lower()) 
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.dpi'] = 200
+# plt.rcParams['figure.dpi'] = 200
 # plt.rcParams['figure.figsize'] = [6, 5]   #disabled for better figures
 
 # colours
@@ -30,19 +30,19 @@ for file in os.listdir(logfolder):
     if file.endswith(".txt") and 'requirements' not in file:
         f_lst.append(file)
 
-filename = f_lst[-1]
-data = np.genfromtxt(logfolder / Path(filename), skip_header=1)
+episode_file = open(logfolder / Path(f_lst[-1]),encoding = 'utf-8')
+episode_num = episode_file.readline().strip('# ')
+data = np.genfromtxt(episode_file, skip_header=1)
 
-ref_sginals = data[:3]
-u_lst = data[3:6]
-x_lst = data[6:]
+ref_signals = data[:,:3]; u_lst = data[:,3:6]; x_lst = data[:,6:]
 dt = 0.01
-time = np.arange(0., x_lst.shape[0] * dt, dt)
+time = np.linspace(0., x_lst.shape[0] * dt, x_lst.shape[0])
 
 fig, axs = plt.subplots(4,2)
-# axs[0,0].plot(time,ref_theta, linestyle = '--',label = 'ref_theta')
-# axs[1,0].plot(time,ref_phi,linestyle = '--' ,label = 'ref_phi')
-# axs[2,0].plot(time,ref_beta, linestyle = '--',label = 'ref_beta')
+fig.suptitle('Episdoe ' + episode_num)
+axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = 'ref_theta')
+axs[1,0].plot(time,ref_signals[:,1],linestyle = '--' ,label = 'ref_phi')
+axs[2,0].plot(time,ref_signals[:,2], linestyle = '--',label = 'ref_beta')
 
 axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = 'alpha')
 axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = 'q')
@@ -55,9 +55,9 @@ axs[3,0].plot(time,x_lst[:,9], label = 'H')
 
 
 # plot actions
-# axs[0,1].plot(time,u_lst[:,0], linestyle = '--',label = 'de')
-# axs[1,1].plot(time,u_lst[:,1], linestyle = '--',label = 'da')
-# axs[2,1].plot(time,u_lst[:,2], linestyle = '--',label = 'dr')
+axs[0,1].plot(time,np.rad2deg(u_lst[:,0]), linestyle = '-',label = r'$\delta_e$')
+axs[1,1].plot(time,np.rad2deg(u_lst[:,1]), linestyle = '-',label = r'$\delta_a$')
+axs[2,1].plot(time,np.rad2deg(u_lst[:,2]), linestyle = '-',label = r'$\delta_r$')
 # axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
 
 # fig2, ax_reward = plt.subplots()
