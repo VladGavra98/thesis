@@ -2,6 +2,7 @@ from fileinput import filename
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+import os
 
 # plot style
 style = 'seaborn-darkgrid'
@@ -24,12 +25,17 @@ savefig = True
 
 # Load state history data:
 logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/latest-run/files/')
-filename = 'statehistory_episode546.txt'
+f_lst = []
+for file in os.listdir(logfolder):
+    if file.endswith(".txt") and 'requirements' not in file:
+        f_lst.append(file)
 
+filename = f_lst[-1]
 data = np.genfromtxt(logfolder / Path(filename), skip_header=1)
 
-
-x_lst = np.asanyarray(data)
+ref_sginals = data[:3]
+u_lst = data[3:6]
+x_lst = data[6:]
 dt = 0.01
 time = np.arange(0., x_lst.shape[0] * dt, dt)
 

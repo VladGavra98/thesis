@@ -50,31 +50,7 @@ parser.add_argument('-next_save', help='Generation save frequency for save_perio
                     type=int, default=num_episodes//10)
 
 
-def save_agent (agent, parameters: object, elite_index: int = None):
-    """ Save the trained agents.
 
-    Args:
-        parameters (_type_): Container class of the trainign hyperparameters.
-        elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
-    """
-    #TODO: move this to agent class
-    actors_dict = {}
-    for i, ind in enumerate(agent.pop):
-        actors_dict[f'actor_{i}'] = ind.actor.state_dict()
-    torch.save(actors_dict, os.path.join(
-        parameters.save_foldername, 'evo_nets.pkl'))
-
-    # Save best performing agent separately:
-    if elite_index is not None:
-        torch.save(agent.pop[elite_index].actor.state_dict(), 
-                    os.path.join(parameters.save_foldername,'elite_net.pkl'))
-    
-    # save state history of the champion
-    filename = 'statehistory_episode' + str(agent.num_episodes) + '.txt'
-    np.savetxt(os.path.join(parameters.save_foldername,filename),
-        agent.champion_state_history, header = str(agent.num_episodes))
-    print('State hitostory saved to ' + str(filename))
-    print("Progress Saved")
 
 
 if __name__ == "__main__":
@@ -159,11 +135,11 @@ if __name__ == "__main__":
         # Save Policy
         if cla.should_log and agent.num_episodes > next_save:
             next_save += parameters.next_save
-            save_agent(agent, parameters, elite_index)
+            agent.save_agent(parameters, elite_index)
 
     # Save final model:
     if cla.should_log:
-        save_agent(agent, parameters, elite_index)
+        agent.save_agent(parameters, elite_index)
 
     if cla.should_log:
         run.finish()

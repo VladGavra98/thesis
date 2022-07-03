@@ -196,7 +196,8 @@ class CitationEnv(BaseEnv):
                         block_width=4,
                         smooth_width=3.0,
                         n_levels=10,
-                        vary_timings=0.1)
+                        vary_timings=0.1) \
+                        + signals.Const(0.,self.t_max, self.theta)
             self.ref = [ref]
 
         elif self.n_actions == 3:
@@ -206,7 +207,8 @@ class CitationEnv(BaseEnv):
                         block_width=4.0,
                         smooth_width=3.0,
                         n_levels=10,
-                        vary_timings=0.04)  
+                        vary_timings=0.04) \
+                         + signals.Const(0.,self.t_max, value = 0.21)
             
             step_phi =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
@@ -216,7 +218,7 @@ class CitationEnv(BaseEnv):
                         n_levels=10,
                         vary_timings=0.04)
 
-            step_beta = step_theta * 0.
+            step_beta = signals.Const(0.0, self.t_max, value = 0.21) 
 
             self.ref = [step_theta, step_phi, step_beta]
 
@@ -304,7 +306,7 @@ class CitationEnv(BaseEnv):
         self.t  += self.dt
 
         # Check if Done:
-        if self.t >= self.t_max or np.abs(self.theta) > 45. or self.H < 200 or np.any(np.isnan(self.x)):
+        if self.t >= self.t_max or np.abs(self.theta) > 60. or np.abs(self.phi) > 75.  or self.H < 200 or np.any(np.isnan(self.x)):
             is_done = True
             reward += (self.t_max - self.t) * self.reward_scale  # max. negative reward for dying soon
    
@@ -353,8 +355,8 @@ def evaluate(verbose : bool = False):
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
     error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
     
-    print(env.observation_space.shape[0])
-    while not done and env.t < 0.1 :
+
+    while not done:
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
         action[-1]*=-1.5  # rudder needs some scaling
@@ -365,7 +367,6 @@ def evaluate(verbose : bool = False):
             
 
         # Simulate one step in environment
-        print('Obs:', obs)
         action = np.clip(action,-1,1)
         obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
@@ -388,8 +389,7 @@ def evaluate(verbose : bool = False):
         x_lst.append(env.x)
         u_lst.append(env.last_u)
         nz_lst.append(env.nz)
-        ref_beta.append(env.ref[2](env.t)); ref_theta.append(env.ref[0](env.t)); ref_phi.append(env.ref[1](env.t))
-
+        
     return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
 
 if __name__=='__main__':
@@ -402,8 +402,8 @@ if __name__=='__main__':
     actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
     
     
-    trials = 1
-    verbose = True if trials == 1  else  False
+    trials = 2
+    verbose = False
     fitness_lst =[]
     for _ in tqdm(range(trials)):
         ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)
@@ -414,12 +414,16 @@ if __name__=='__main__':
     # Plotting:
     import matplotlib.pyplot as plt
     x_lst = np.asarray(x_lst); u_lst = np.asarray(u_lst)
-    time = np.arange(0., env.t , env.dt)
+    time = np.linspace(0., env.t , len(x_lst))
+    ref_values = np.array([[ref(t_i) for t_i in time] for ref in env.ref]).transpose()
 
+    history = np.concatenate((ref_values, u_lst, x_lst ), axis = 1)
+
+ 
     fig, axs = plt.subplots(4,2)
-    axs[0,0].plot(time,ref_theta, linestyle = '--',label = 'ref_theta')
-    axs[1,0].plot(time,ref_phi,linestyle = '--' ,label = 'ref_phi')
-    axs[2,0].plot(time,ref_beta, linestyle = '--',label = 'ref_beta')
+    axs[0,0].plot(time,history[:,0], linestyle = '--',label = 'ref_theta')
+    axs[1,0].plot(time,history[:,1],linestyle = '--' ,label = 'ref_phi')
+    axs[2,0].plot(time,history[:,2], linestyle = '--',label = 'ref_beta')
 
     axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = 'alpha')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = 'q')

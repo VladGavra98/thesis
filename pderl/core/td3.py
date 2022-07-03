@@ -16,25 +16,26 @@ class Critic(nn.Module):
         self.args = args
 
         # layer sizes
-        l1 = 200; l2 = 300; l3 = l2
+        # l1 = 200; l2 = 300; l3 = l2   
+        l1 =32; l2 = 64;
 
         # Critic 1
         self.l1_1 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_1 = LayerNorm(l1)
         self.l2_1 = nn.Linear(l1, l2)
         self.lnorm2_1 = LayerNorm(l2)
-        self.out_1 = nn.Linear(l3, 1)
+        self.lout_1 = nn.Linear(l2, 1)
 
         # Critic 2
         self.l1_2 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_2 = LayerNorm(l1)
         self.l2_2 = nn.Linear(l1, l2)
         self.lnorm2_2 = LayerNorm(l2)
-        self.out_2 = nn.Linear(l3, 1)
+        self.lout_2 = nn.Linear(l2, 1)
 
         # Initlaise wights with smaller values
-        self.out_1.weight.data.mul_(0.1);self.out_1.bias.data.mul_(0.1)
-        self.out_2.weight.data.mul_(0.1);self.out_2.bias.data.mul_(0.1)
+        self.lout_1.weight.data.mul_(0.1);self.lout_1.bias.data.mul_(0.1)
+        self.lout_2.weight.data.mul_(0.1);self.lout_2.bias.data.mul_(0.1)
 
 
         self.to(self.args.device)
@@ -52,7 +53,7 @@ class Critic(nn.Module):
         out = F.elu(out)
 
         # output interface
-        out1 = self.out_1(out)
+        out1 = self.lout_1(out)
 
         # ------ Critic 2 ---------
         # hidden Layer 1 (Input Interface)
@@ -66,7 +67,7 @@ class Critic(nn.Module):
         out = F.elu(out)
 
         # output interface
-        out2 = self.out_2(out)
+        out2 = self.lout_2(out)
 
         return out1, out2
 
