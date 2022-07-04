@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
-from torch.optim import Adam
 from torch.nn import functional as F
-from core import replay_memory
+from torch.optim import Adam
 
+from core import replay_memory
 from core.genetic_agent import Actor
 from core.mod_utils import hard_update, soft_update, LayerNorm
 
 from typing import Tuple, Dict, List
+
+MAX_GRAD_NORM = 10
 
 class Critic(nn.Module):
 
@@ -17,9 +19,10 @@ class Critic(nn.Module):
 
         # layer sizes
         # l1 = 200; l2 = 300; l3 = l2   
-        l1 =32; l2 = 64;
+        l1 =128; l2 = 64;
 
         # Critic 1
+        self.bnorm_1 = LayerNorm(args.state_dim + args.action_dim)  # batch norm
         self.l1_1 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_1 = LayerNorm(l1)
         self.l2_1 = nn.Linear(l1, l2)
@@ -27,6 +30,7 @@ class Critic(nn.Module):
         self.lout_1 = nn.Linear(l2, 1)
 
         # Critic 2
+        self.bnorm_2 = LayerNorm(args.state_dim + args.action_dim)
         self.l1_2 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_2 = LayerNorm(l1)
         self.l2_2 = nn.Linear(l1, l2)
@@ -42,8 +46,10 @@ class Critic(nn.Module):
 
     def forward(self, state, action):
         # ------ Critic 1 ---------
-        # hidden Layer 1 (Input Interface)
         input = torch.cat((state,action), 1)
+        input = self.bnorm_1(input)
+
+        # hidden Layer 1 (Input Interface)
         out = F.elu(self.l1_1(input))
         out = self.lnorm1_1(out)
 
@@ -58,6 +64,8 @@ class Critic(nn.Module):
         # ------ Critic 2 ---------
         # hidden Layer 1 (Input Interface)
         input = torch.cat((state,action), 1)
+        input = self.bnorm_2(input)
+
         out = F.elu(self.l1_2(input))
         out = self.lnorm1_2(out)
 
@@ -88,7 +96,6 @@ class TD3(object):
         self.critic_target = Critic(args)
         self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
-
         # Initliase loss
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()
@@ -111,7 +118,7 @@ class TD3(object):
             next_state_batch = next_state_batch.to(self.args.device)
             action_batch = action_batch.to(self.args.device)
             reward_batch = reward_batch.to(self.args.device)
-            if self.args.use_done_mask: done_batch = done_batch.to(self.args.device)
+            done_batch = done_batch.to(self.args.device)
 
             # Select action according to policy 
             next_action_batch = self.actor_target.forward(next_state_batch)
@@ -119,36 +126,37 @@ class TD3(object):
             # Compute the target Q values
             target_Q1, target_Q2 = self.critic_target.forward(next_state_batch, next_action_batch)
             next_Q = torch.min(target_Q1, target_Q2)
-            if self.args.use_done_mask: next_Q = next_Q * (1 - done_batch) # Done mask
+            next_Q = next_Q * (1 - done_batch) # Done mask
             target_q = reward_batch + (self.gamma * next_Q).detach()
 
         # Get current Q estimates
         current_q1, current_q2 = self.critic.forward(state_batch, action_batch)
 
-        # Compute critic loss
-        TD = F.mse_loss(current_q1, target_q) + F.mse_loss(current_q2, target_q)
+        # Compute critic losses
+        loss_q1 = F.mse_loss(current_q1, target_q)
+        loss_q2 = F.mse_loss(current_q2, target_q)
+        TD =  loss_q1 + loss_q2
 
-        # Optimize the critic
+        # Optimize the criticss
         self.critic_optim.zero_grad()
         TD.backward()
-        nn.utils.clip_grad_norm_(self.critic.parameters(), 10)
+        nn.utils.clip_grad_norm_(self.critic.parameters(), MAX_GRAD_NORM)
         self.critic_optim.step()
 
         # Actor Update
-        if iteration % self.args.policy_update_freq ==0:
+        if iteration % self.args.policy_update_freq == 0:
             self.actor_optim.zero_grad()
-            # retrieve value of the first critic
-            est_q1, _ = self.critic.forward(state_batch, self.actor.forward(state_batch))
-            policy_grad_loss = -(est_q1).mean()   # add minus to make it a loss
-            policy_loss = policy_grad_loss
 
-            policy_loss.backward()
-            nn.utils.clip_grad_norm_(self.actor.parameters(), 10)
+            # retrieve value of the critics
+            est_q1,est_q2 = self.critic.forward(state_batch, self.actor.forward(state_batch))
+            policy_grad_loss = -torch.mean(torch.min(est_q1, est_q2))   # add minus to make it a loss
+
+            # backprop
+            policy_grad_loss.backward()
+            nn.utils.clip_grad_norm_(self.actor.parameters(), MAX_GRAD_NORM)
             self.actor_optim.step()
 
-            # I think pytorch might complain about netwok 'version' 
-            # if the soft upadtes are before grad steps
-            # NOTE check this!!
+            # smooth target updates 
             soft_update(self.actor_target, self.actor, self.tau)
             soft_update(self.critic_target, self.critic, self.tau)
 

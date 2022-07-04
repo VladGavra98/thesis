@@ -1,30 +1,27 @@
-import os
-import time
-from weakref import ref
-import numpy as np
-import torch
+from matplotlib import pyplot as plt
+from core import genetic_agent, mod_utils, replay_memory
 from core import mod_neuro_evo as utils_ne
-from core import replay_memory
 from core import ddpg as ddpg
 from core import td3 as td3
-from core import replay_memory
-from core import genetic_agent, mod_utils
-from dataclasses import dataclass
 from parameters import Parameters
-from tqdm import tqdm
-import dask
+import numpy as np
+import torch
+from dataclasses import dataclass
 from typing import List, Dict, Tuple
+from tqdm import tqdm
+import os, time
 
 @dataclass                                                                                                                                      
 class Episode: 
-    """ Episode output"""                                                                                                                     
-    reward: np.float64                                                                                                                             
-    bcs: Tuple[np.float64]                                                                                                                           
-    length: np.float64 
-    state_history: List
-    ref_signals: List
-    actions : List
-    reward_lst: List
+    """ Output of one episode. 
+    """                                                                                                                     
+    reward        : np.float64                                                                                                                             
+    bcs           : Tuple[np.float64]                                                                                                                           
+    length        : np.float64 
+    state_history : List
+    ref_signals   : List
+    actions       : List
+    reward_lst    : List
 
 
 class Agent:
@@ -33,10 +30,9 @@ class Agent:
         self.env = environment
 
         # Init population
-        self.pop = []
-        self.buffers = []
-        for _ in range(args.pop_size):
-            self.pop.append(genetic_agent.GeneticAgent(args))
+        self.pop : List = []
+        self.buffers : List = []
+        self.pop = [genetic_agent.GeneticAgent(args) for _ in range(args.pop_size)]
 
         # Define RL Agent
         print('Anget type: ' + ('DDPG' if args.use_ddpg else 'TD3'))
@@ -79,9 +75,10 @@ class Agent:
         self.champion_history : np.ndarray = None
 
 
-    def evaluate (self,agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
+    def evaluate (self,
+                  agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
                   is_action_noise : bool,
-                  store_transition : bool = True) -> Episode:
+                  store_transition : bool) -> Episode:
         """ Play one game to evaualute the agent.
 
         Args:
@@ -90,10 +87,10 @@ class Agent:
             store_transition (bool, optional): Add frames to memory buffer for training. Defaults to True.
 
         Returns:
-            tuple: Reward, temporal difference error
+            Episode: data class with the episode stats
         """
+        # init states and env
         rewards, state_lst, action_lst = [],[], []
-
         obs = self.env.reset()
         done = False
 
@@ -123,9 +120,9 @@ class Agent:
                 agent.buffer.add(*transition)
                 self.num_frames += 1; self.gen_frames += 1
             else:
-                # store for evalaution
+                # save for future validation
                 state_lst.append(self.env.x)
-                action_lst.append(action)
+                action_lst.append(self.env.last_u)
 
             # update agent obs
             obs = next_obs
@@ -133,9 +130,9 @@ class Agent:
         # updated episodes if is done
         if store_transition: 
             self.num_episodes += 1
-
+        
         return Episode(reward = sum(rewards), bcs = bcs, length = info['t'],\
-                       state_history=state_lst, ref_signals=info['ref'], \
+                       state_history=state_lst, ref_signals = info['ref'], \
                        actions = action_lst,  reward_lst = rewards)
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
@@ -159,7 +156,7 @@ class Agent:
                 novelties[i] += (net.get_novelty(batch))
         return novelties / epochs
 
-    def train_rl(self):
+    def train_rl(self) -> Dict[float, float]:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
             The frames are sampled from the common buffer.
         """
@@ -175,9 +172,10 @@ class Agent:
 
                 if pgl is not None:
                     pgs_obj.append(-pgl)
+
                 TD_loss.append(TD)
 
-        return {'PG_obj': pgs_obj, 'TD_loss': TD_loss}
+        return {'PG_obj': np.mean(pgs_obj), 'TD_loss': np.mean(TD_loss)}
 
     def validate_actor (self, champion : genetic_agent.Actor):
         """ Evaluate the  given actor - do NOT store these trials. 
@@ -189,7 +187,7 @@ class Agent:
                                     store_transition=False) 
             test_scores.append(episode.reward)
 
-        futures = dask.persist(*test_scores); test_scores = dask.compute(*futures)
+        # futures = dask.persist(*test_scores); test_scores = dask.compute(*futures)
         test_score = np.mean(test_scores)
         test_sd = np.std(test_scores)
 
@@ -212,18 +210,18 @@ class Agent:
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
         # Evaluate genomes/individuals
         # >>> loop over population AND store experiences
+        rewards, bcs_lst, lengths = [], [], [] 
         for net in self.pop:   
             for _ in range(self.args.num_evals):
-                episode = dask.delayed(self.evaluate)(net,is_action_noise=False)
+                episode = self.evaluate(net, is_action_noise = False,\
+                                       store_transition=True)
                 rewards.append(episode.reward)
                 bcs_lst.append(episode.bcs)
                 lengths.append(episode.length)
-        futures = dask.persist(*rewards); rewards = dask.compute(*futures); rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
-        futures = dask.persist(*bcs_lst); bcs_lst = dask.compute(*futures); bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
-        futures = dask.persist(*lengths); lengths = dask.compute(*futures); 
-  
+
         # take average stats
-        print(rewards.shape)
+        rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
+        bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
         rewards = np.mean(rewards, axis = 0) 
         bcs     = np.mean(bcs_lst, axis = 0)
         avg_len = np.mean(lengths)
@@ -242,11 +240,11 @@ class Agent:
         elite_index = self.evolver.epoch(self.pop, rewards)
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3) ++++++++++++++++++++++++++++++++++++++'''
-        # Collect experience for training -- No dask needed
-        self.evaluate(self.rl_agent, is_action_noise=True)
+        # Collect experience for training 
+        self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
 
         # Gradient update
-        losses = self.train_rl()
+        rl_train_scores = self.train_rl()
 
         # validate rl separately
         rl_reward,rl_std, _ = self.validate_actor(self.rl_agent)
@@ -277,25 +275,25 @@ class Agent:
             'rl_reward':   rl_reward,
             'rl_std':      rl_std,
             'avg_ep_len':  avg_len, 
-            'PG_obj':      np.mean(losses['PG_obj']),
-            'TD_loss':     np.mean(losses['TD_loss']),
+            'PG_obj':      rl_train_scores['PG_obj'],
+            'TD_loss':     rl_train_scores['TD_loss'],
             'pop_novelty': 0.,
         }
 
 
     def save_agent (self, parameters: object, elite_index: int = None) -> None:
-        """ Save the trained agents.
+        """ Save the trained agent(s).
 
         Args:
             parameters (object): Container class of the trainign hyperparameters.
             elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
         """
-        actors_dict = {}
+        pop_dict = {}
 
         # Save gentic popualtion
         for i, ind in enumerate(self.pop):
-            actors_dict[f'actor_{i}'] = ind.actor.state_dict()
-        torch.save(actors_dict, os.path.join(
+            pop_dict[f'actor_{i}'] = ind.actor.state_dict()
+        torch.save(pop_dict, os.path.join(
             parameters.save_foldername, 'evo_nets.pkl'))
 
         # Save best performing agent separately:

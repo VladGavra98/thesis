@@ -25,34 +25,46 @@ savefig = True
 
 # Load state history data:
 logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/latest-run/files/')
-f_lst = []
+f_lst,ep_num_lst = [], []
 for file in os.listdir(logfolder):
     if file.endswith(".txt") and 'requirements' not in file:
         f_lst.append(file)
+        ep_num_lst.append(int(file.strip('statehistory_episode.txt')))
 
-episode_file = open(logfolder / Path(f_lst[-1]),encoding = 'utf-8')
-episode_num = episode_file.readline().strip('# ')
+
+f_lst = [f_lst[i] for i in np.argsort(ep_num_lst)]
+ep_num_lst = sorted(ep_num_lst)
+
+idx = -1
+episode_file = open(logfolder / Path(f_lst[idx]),encoding = 'utf-8')
+# episode_num = episode_file.readline().strip('# ')
 data = np.genfromtxt(episode_file, skip_header=1)
 
-ref_signals = data[:,:3]; u_lst = data[:,3:6]; x_lst = data[:,6:]
+ref_signals = data[:,:3]; u_lst = data[:,3:6]; x_lst = data[:,6:-1]; rewards = data[:,-1]
 dt = 0.01
 time = np.linspace(0., x_lst.shape[0] * dt, x_lst.shape[0])
 
 fig, axs = plt.subplots(4,2)
-fig.suptitle('Episdoe ' + episode_num)
-axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = 'ref_theta')
-axs[1,0].plot(time,ref_signals[:,1],linestyle = '--' ,label = 'ref_phi')
-axs[2,0].plot(time,ref_signals[:,2], linestyle = '--',label = 'ref_beta')
+fig.suptitle(f'Episdoe {ep_num_lst[idx]}')
 
-axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = 'alpha')
-axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = 'q')
-axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = 'theta')
 
-axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = 'beta')
-axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = 'phi')
-axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = 'p')
-axs[3,0].plot(time,x_lst[:,9], label = 'H')
+# axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
+axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
+axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
+axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = r'$\theta_{ref}$')
+axs[0,0].set_ylabel(r'$\theta~[deg],q~[deg/s]$')
 
+axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$')
+axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$')
+axs[1,0].plot(time,ref_signals[:,1], linestyle = '--',label = r'$\phi_{ref}$')
+axs[1,0].set_ylabel(r'$\phi~[deg],p~[deg/s]$')
+
+axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = r'$\beta$')
+axs[2,0].plot(time,ref_signals[:,2], linestyle = '--',label = r'$\beta_{ref}$')
+axs[2,0].set_ylabel(r'$\beta~[deg]$')
+
+axs[3,0].plot(time,x_lst[:,9])
+axs[3,0].set_ylabel(r'$H~[m]$')
 
 # plot actions
 axs[0,1].plot(time,np.rad2deg(u_lst[:,0]), linestyle = '-',label = r'$\delta_e$')
@@ -60,9 +72,10 @@ axs[1,1].plot(time,np.rad2deg(u_lst[:,1]), linestyle = '-',label = r'$\delta_a$'
 axs[2,1].plot(time,np.rad2deg(u_lst[:,2]), linestyle = '-',label = r'$\delta_r$')
 # axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
 
-# fig2, ax_reward = plt.subplots()
-# # ax_reward.plot(time,rewards)
-# ax_reward.set_ylabel('Reward [-]')
+fig2, ax_reward = plt.subplots()
+print('Validation fitness of champion: ' , sum(rewards))
+ax_reward.plot(time,rewards)
+ax_reward.set_ylabel('Reward [-]'); ax_reward.set_xlabel('Time [s]')
 for i in range(4):
     for j in range(2):
         axs[i,j].set_xlabel('Time [s]')

@@ -104,7 +104,11 @@ class CitationEnv(BaseEnv):
         self.ref: List[signals.BaseSignal] = None
         
         # actuator bounds
-        self.rate_bound = np.deg2rad(30)        #  [deg/s] 
+        self.rate_bound = np.deg2rad(25)        #  [deg/s] 
+
+        # state bounds
+        self.max_theta = np.deg2rad(60.)
+        self.max_phi = np.deg2rad(75.)
 
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
@@ -218,7 +222,7 @@ class CitationEnv(BaseEnv):
                         n_levels=10,
                         vary_timings=0.04)
 
-            step_beta = signals.Const(0.0, self.t_max, value = 0.21) 
+            step_beta = signals.Const(0.0, self.t_max, value = 0.0) 
 
             self.ref = [step_theta, step_phi, step_beta]
 
@@ -250,7 +254,7 @@ class CitationEnv(BaseEnv):
     def check_envelope_bounds():
         raise NotImplementedError
 
-    def reset(self, **kwargs) -> np.ndarray:
+    def reset (self, **kwargs) -> np.ndarray:
         # Reset time
         self.t = 0.0
 
@@ -261,7 +265,8 @@ class CitationEnv(BaseEnv):
         self.last_u = np.zeros(self.action_space.shape[0])
 
         # Init state vector and observation vector
-        _input = np.pad(self.last_u,(0, self.n_actions_full - self.n_actions), 
+        _input = np.pad(self.last_u,
+                        (0, self.n_actions_full - self.n_actions), 
                         'constant', constant_values = (0.))
         self.x = citation.step(_input)
 
@@ -273,7 +278,7 @@ class CitationEnv(BaseEnv):
 
         return self.obs
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
+    def step (self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         """ Gym-like step function returns: (state, reward, done, info) 
 
         Args:
@@ -288,7 +293,7 @@ class CitationEnv(BaseEnv):
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action, tau = 1)
+        u = self.filter_action(action, tau = 0.9)
         self.last_u = u
 
         # Step the system
@@ -306,9 +311,11 @@ class CitationEnv(BaseEnv):
         self.t  += self.dt
 
         # Check if Done:
-        if self.t >= self.t_max or np.abs(self.theta) > 60. or np.abs(self.phi) > 75.  or self.H < 200 or np.any(np.isnan(self.x)):
+        if self.t >= self.t_max or np.abs(self.theta) > self.max_theta \
+                or np.abs(self.phi) > self.max_phi  \
+                or self.H < 200 or np.any(np.isnan(self.x)):
             is_done = True
-            reward += (self.t_max - self.t) * self.reward_scale  # max. negative reward for dying soon
+            reward += (self.t_max - self.t) * self.reward_scale * 100  # negative reward for dying soon
    
         # info:
         info = {
@@ -349,7 +356,7 @@ def evaluate(verbose : bool = False):
 
 
     # PID gains
-    p, i, d = 12, 5, 2
+    p, i, d = 20, 6,5
     
     ref_beta, ref_theta, ref_phi = [], [], []
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
@@ -357,6 +364,10 @@ def evaluate(verbose : bool = False):
     
 
     while not done:
+        u_lst.append(env.last_u)
+        x_lst.append(env.x)
+        nz_lst.append(env.nz)
+
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
         action[-1]*=-1.5  # rudder needs some scaling
@@ -386,9 +397,7 @@ def evaluate(verbose : bool = False):
 
         # save 
         rewards.append(reward)
-        x_lst.append(env.x)
-        u_lst.append(env.last_u)
-        nz_lst.append(env.nz)
+
         
     return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
 
@@ -421,25 +430,25 @@ if __name__=='__main__':
 
  
     fig, axs = plt.subplots(4,2)
-    axs[0,0].plot(time,history[:,0], linestyle = '--',label = 'ref_theta')
-    axs[1,0].plot(time,history[:,1],linestyle = '--' ,label = 'ref_phi')
-    axs[2,0].plot(time,history[:,2], linestyle = '--',label = 'ref_beta')
+    axs[0,0].plot(time,history[:,0], linestyle = '--',label = r'$\theta_{ref}$')
+    axs[1,0].plot(time,history[:,1],linestyle = '--' ,label = r'$\phi_{ref}$')
+    axs[2,0].plot(time,history[:,2], linestyle = '--',label = r'$\beta_{ref}$')
 
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = 'alpha')
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = 'q')
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = 'theta')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
 
-    axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = 'beta')
-    axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = 'phi')
-    axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = 'p')
+    axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = r'$\beta$')
+    axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$')
+    axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$')
     axs[3,0].plot(time,x_lst[:,9], label = 'H')
 
 
     # plot actions
-    axs[0,1].plot(time,u_lst[:,0], linestyle = '--',label = 'de')
-    axs[1,1].plot(time,u_lst[:,1], linestyle = '--',label = 'da')
-    axs[2,1].plot(time,u_lst[:,2], linestyle = '--',label = 'dr')
-    axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
+    axs[0,1].plot(time,np.rad2deg(u_lst[:,0]), linestyle = '--',label = r'$\delta_e$ [deg]')
+    axs[1,1].plot(time,np.rad2deg(u_lst[:,1]), linestyle = '--',label = r'$\delta_a$ [deg]')
+    axs[2,1].plot(time,np.rad2deg(u_lst[:,2]), linestyle = '--',label = r'$\delta_r$ [deg]')
+    axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = r'$n_z$ [g]')
   
     fig2, ax_reward = plt.subplots()
     ax_reward.plot(time,rewards)
