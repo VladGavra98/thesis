@@ -46,7 +46,7 @@ class Parameters:
         self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 256
-        self.frac_frames_train = 0.99
+        self.frac_frames_train = 0.01
         self.use_done_mask = True
         self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1
@@ -68,13 +68,8 @@ class Parameters:
         self.noise_clip         = 0.5  # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
-
-        # Num of trials
-        if cla.env == 'Walker2d-v2':
-            self.num_evals = 5
-        else:
-            self.num_evals = 3
-
+        # Num. of trials during evaluation step
+        self.num_evals = 3
         # Elitism Rate
         self.elite_fraction = 0.2
  
