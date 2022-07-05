@@ -131,7 +131,7 @@ class Agent:
         if store_transition: 
             self.num_episodes += 1
         
-        return Episode(reward = sum(rewards), bcs = bcs, length = info['t'],\
+        return Episode(reward = np.sum(rewards), bcs = bcs, length = info['t'],\
                        state_history=state_lst, ref_signals = info['ref'], \
                        actions = action_lst,  reward_lst = rewards)
 
@@ -162,7 +162,7 @@ class Agent:
         """
         print('Train RL agent ...')
         pgs_obj, TD_loss = [], []
-        if len(self.replay_buffer) > self.args.batch_size * 5:  
+        if len(self.replay_buffer) > self.args.batch_size * 20:  
             # agent has seen some experiences already
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
@@ -177,14 +177,14 @@ class Agent:
 
         return {'PG_obj': np.mean(pgs_obj), 'TD_loss': np.mean(TD_loss)}
 
-    def validate_actor (self, champion : genetic_agent.Actor):
-        """ Evaluate the  given actor - do NOT store these trials. 
+    def validate_actor (self, actor : genetic_agent.Actor) -> Tuple[float, float, Episode]:
+        """ Evaluate the  given actor and do NOT store these trials. 
         """
         test_scores = []
         
         for _ in range(self.validation_tests):
-            episode = self.evaluate(champion,is_action_noise=False,\
-                                    store_transition=False) 
+            episode = self.evaluate(actor, is_action_noise = False,\
+                                        store_transition = False) 
             test_scores.append(episode.reward)
 
         # futures = dask.persist(*test_scores); test_scores = dask.compute(*futures)
@@ -207,52 +207,62 @@ class Agent:
         self.gen_frames = 0
         self.iterations += 1
         rewards, bcs_lst, lengths = [], [], [] 
+        best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
+        test_score = 1; test_sd = 1; 
 
-        '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
-        # Evaluate genomes/individuals
-        # >>> loop over population AND store experiences
-        rewards, bcs_lst, lengths = [], [], [] 
-        for net in self.pop:   
-            for _ in range(self.args.num_evals):
-                episode = self.evaluate(net, is_action_noise = False,\
-                                       store_transition=True)
-                rewards.append(episode.reward)
-                bcs_lst.append(episode.bcs)
-                lengths.append(episode.length)
+        if len(self.pop):
+            '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
+            # Evaluate genomes/individuals
+            # >>> loop over population AND store experiences
+            for net in self.pop:   
+                for _ in range(self.args.num_evals):
+                    episode = self.evaluate(net, is_action_noise = False,\
+                                        store_transition=True)
+                    rewards.append(episode.reward)
+                    bcs_lst.append(episode.bcs)
+                    lengths.append(episode.length)
 
-        # take average stats
-        rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
-        bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
-        rewards = np.mean(rewards, axis = 0) 
-        bcs     = np.mean(bcs_lst, axis = 0)
-        ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
+            # take average stats
+            rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
+            bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
+            rewards = np.mean(rewards, axis = 0) 
+            bcs     = np.mean(bcs_lst, axis = 0)
+            ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
 
 
-        # get popualtion stats
-        best_train_fitness  = np.max(rewards)              # champion - highest reward
-        worst_train_fitness = np.min(rewards)
-        population_avg      = np.average(rewards)          # population_avg 
-        champion            = self.pop[np.argmax(rewards)]
+            # get popualtion stats
+            best_train_fitness  = np.max(rewards)              # champion - highest reward
+            worst_train_fitness = np.min(rewards)
+            population_avg      = np.average(rewards)          # population_avg 
+            champion            = self.pop[np.argmax(rewards)]
 
-        # Validation test for NeuroEvolution 
-        test_score, test_sd, last_episode = self.validate_actor(champion)
-        self.get_champ_history(last_episode)
+            # Validation test for NeuroEvolution 
+            test_score, test_sd, last_episode = self.validate_actor(champion)
+            self.get_champ_history(last_episode)
 
-        # NeuroEvolution's probabilistic selection and recombination step
-        elite_index = self.evolver.epoch(self.pop, rewards)
+            # NeuroEvolution's probabilistic selection and recombination step
+            elite_index = self.evolver.epoch(self.pop, rewards)
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3) ++++++++++++++++++++++++++++++++++++++'''
-        # Collect experience for training 
+        # Collect extra experience for RL training 
+        if len(self.pop) < 10:
+            print('Info: playing extra episodes with action nosie for RL training')
+            for _ in range(10):
+                episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
+                lengths.append(episode.length)
+
+            ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
+
         self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
 
-        # Gradient update
+        # Gradient updates of RL actor and critic
         rl_train_scores = self.train_rl()
 
-        # validate rl separately
+        # Validate rl separately
         rl_reward,rl_std, _ = self.validate_actor(self.rl_agent)
 
         ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''
-        if self.iterations % self.args.rl_to_ea_synch_period == 0:
+        if self.iterations % self.args.rl_to_ea_synch_period == 0 and len(self.pop):
             # Replace any index different from the new elite
             replace_index = np.argmin(rewards)
 

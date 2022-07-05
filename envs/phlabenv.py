@@ -190,7 +190,7 @@ class CitationEnv(BaseEnv):
     @property
     def nz(self) -> float:
         """ Load factor [g] """
-        return 1 + self.V * self.q/ 9.80665 
+        return 1 + self.V * self.q/9.80665 
 
     def init_ref(self):
         if self.n_actions ==1:
@@ -240,7 +240,7 @@ class CitationEnv(BaseEnv):
 
     def get_reward(self) -> float:
         self.calc_error()
-        reward_vec =  np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
+        reward_vec = np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
         reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
         return reward
     
@@ -312,10 +312,11 @@ class CitationEnv(BaseEnv):
 
         # Check if Done:
         if self.t >= self.t_max or np.abs(self.theta) > self.max_theta \
-                or np.abs(self.phi) > self.max_phi  \
-                or self.H < 200 or np.any(np.isnan(self.x)):
+            or np.abs(self.phi) > self.max_phi  or self.H < 200:
+            if np.any(np.isnan(self.x)):
+                print('NaN enountered:', self.x)
             is_done = True
-            reward += (self.t_max - self.t) * self.reward_scale * 100  # negative reward for dying soon
+            reward += (self.t_max - self.t) * self.reward_scale * 200  # negative reward for dying soon
    
         # info:
         info = {
@@ -370,7 +371,9 @@ def evaluate(verbose : bool = False):
 
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
-        action[-1]*=-1.5  # rudder needs some scaling
+
+        if action.shape[0] > 1:
+            action[-1]*=-1.5  # rudder needs some scaling
         error_dev  = obs[:env.n_actions]
 
         if verbose:
