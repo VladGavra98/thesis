@@ -4,7 +4,7 @@ from typing import List, Tuple, Dict
 import fastrand
 import torch
 import torch.distributions as dist
-from core.mod_utils import is_lnorm_key, hard_update, soft_update
+from core.mod_utils import hard_update, soft_update
 from parameters import Parameters
 import os
 
@@ -268,7 +268,7 @@ class SSNE:
         # Crossover for selected offsprings
         if self.args.crossover_prob > 0.01:  # so far this is not called
             for i in offsprings:
-                if fastrand.pcg32bounded(100)/100 < self.args.crossover_prob:
+                if random.random() < self.args.mutation_prob:
                     others = offsprings.copy()
                     others.remove(i)
                     off_j = random.choice(others)
@@ -277,7 +277,7 @@ class SSNE:
         # Mutate all genes in the population 
         #  EXCEPT the new elitists
         for i in index_rank[self.num_elitists:]:
-            if fastrand.pcg32bounded(100)/100 < self.args.mutation_prob:
+            if random.random() < self.args.mutation_prob:
                 # print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
                 self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
 

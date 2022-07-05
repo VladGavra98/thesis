@@ -197,6 +197,7 @@ class Agent:
         time = np.linspace(0, episode.length, len(episode.state_history))
         ref_values = np.array([[ref(t_i) for t_i in time] for ref in episode.ref_signals]).transpose()
         reward_lst = np.asarray(episode.reward_lst).reshape((len(episode.state_history),1))
+
         self.champion_history = np.concatenate((ref_values, \
                                                 episode.actions,\
                                                 episode.state_history, \
@@ -224,7 +225,8 @@ class Agent:
         bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
         rewards = np.mean(rewards, axis = 0) 
         bcs     = np.mean(bcs_lst, axis = 0)
-        avg_len = np.mean(lengths)
+        ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
+
 
         # get popualtion stats
         best_train_fitness  = np.max(rewards)              # champion - highest reward
@@ -274,7 +276,8 @@ class Agent:
             'elite_index': elite_index,
             'rl_reward':   rl_reward,
             'rl_std':      rl_std,
-            'avg_ep_len':  avg_len, 
+            'avg_ep_len':  ep_len_avg, 
+            'ep_len_sd':   ep_len_sd, 
             'PG_obj':      rl_train_scores['PG_obj'],
             'TD_loss':     rl_train_scores['TD_loss'],
             'pop_novelty': 0.,
