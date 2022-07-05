@@ -1,7 +1,7 @@
 import pprint
 import os
 import torch
-
+import numpy as np
 
 class Parameters:
     def __init__(self, cla, init=True):
@@ -45,15 +45,15 @@ class Parameters:
         self.gamma = 0.98
         self.tau = 0.005   
         self.seed = cla.seed
-        self.batch_size = 256
-        self.frac_frames_train = 1.0
+        self.batch_size = 128
+        self.frac_frames_train = 0.01
         self.use_done_mask = True
         self.buffer_size = 200_000  #50000
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 128
+        self.hidden_size = 64  # NOTE  has been changed from 128
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -65,22 +65,18 @@ class Parameters:
 
         # ==================================    TD3 Params  =============================================
         self.policy_update_freq = 2    # minimum for TD3
-        self.noise_clip         = 0.5  # default
+        self.noise_clip         = 0.5  # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
+        # Num. of trials during evaluation step
+        self.num_evals = 3
 
-        # Num of trials
-        if cla.env == 'Walker2d-v2':
-            self.num_evals = 5
-        else:
-            self.num_evals = 3
+        # Number of actors in the population
+        self.pop_size = 10
 
-        # Elitism Rate
+        # Elitism Rate - % of elites 
         self.elite_fraction = 0.2
  
-        # Number of actors in the population
-        self.pop_size = 30
-
         # Mutation and crossover
         self.crossover_prob = 0.0
         self.mutation_prob = 0.9
@@ -101,7 +97,7 @@ class Parameters:
         self.test_operators = cla.test_operators
 
         # Save Results
-        self.state_dim = None  # To be initialised externally
+        self.state_dim = None   # To be initialised externally
         self.action_dim = None  # To be initialised externally
         self.save_foldername = './logs/tmp/'
 
@@ -121,4 +117,29 @@ class Parameters:
             print(params)
 
         return self.__dict__
+
+    def save_agent (self,  parameters: object, elite_index: int = None):
+        """ Save the trained agents.
+
+        Args:
+            parameters (_type_): Container class of the trainign hyperparameters.
+            elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
+        """
+        actors_dict = {}
+        for i, ind in enumerate(self.pop):
+            actors_dict[f'actor_{i}'] = ind.actor.state_dict()
+        torch.save(actors_dict, os.path.join(
+            parameters.save_foldername, 'evo_nets.pkl'))
+
+        # Save best performing agent separately:
+        if elite_index is not None:
+            torch.save(self.pop[elite_index].actor.state_dict(), 
+                        os.path.join(parameters.save_foldername,'elite_net.pkl'))
+        
+        # save state history of the champion
+        filename = 'statehistory_episode' + str(self.num_episodes) + '.txt'
+        np.savetxt(os.path.join(parameters.save_foldername,filename),
+            self.champion_state_history, header = str(self.num_episodes))
+        print('State hitostory saved to ' + str(filename))
+        print("Progress Saved")
   

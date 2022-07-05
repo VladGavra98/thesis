@@ -14,11 +14,10 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.8.10
-    start_time: 1656508539
+    start_time: 1656947394
     t:
       1:
       - 1
-      - 54
       - 55
       3:
       - 13
@@ -29,13 +28,13 @@ _wandb:
       - 5
 action_dim:
   desc: null
-  value: 1
+  value: 3
 alpha:
   desc: null
   value: 0.7
 batch_size:
   desc: null
-  value: 256
+  value: 128
 beta_zero:
   desc: null
   value: 0.5
@@ -59,7 +58,7 @@ elite_fraction:
   value: 0.2
 env_name:
   desc: null
-  value: PHlab_symmetric
+  value: PHlab_attitude
 frac_frames_train:
   desc: null
   value: 1.0
@@ -68,13 +67,13 @@ gamma:
   value: 0.98
 hidden_size:
   desc: null
-  value: 128
+  value: 64
 individual_bs:
   desc: null
   value: 10000
 learn_start:
   desc: null
-  value: 1564.5
+  value: 3127.0
 mutation_batch_size:
   desc: null
   value: 256
@@ -86,7 +85,7 @@ mutation_prob:
   value: 0.9
 next_save:
   desc: null
-  value: 100
+  value: 40
 noise_clip:
   desc: null
   value: 0.5
@@ -104,7 +103,7 @@ num_evals:
   value: 3
 num_frames:
   desc: null
-  value: 200000
+  value: 800000
 opstat:
   desc: null
   value: false
@@ -119,7 +118,7 @@ policy_update_freq:
   value: 2
 pop_size:
   desc: null
-  value: 30
+  value: 10
 proximal_mut:
   desc: null
   value: true
@@ -131,10 +130,10 @@ rl_to_ea_synch_period:
   value: 1
 run_name:
   desc: null
-  value: test_phlab_lon
+  value: stricter_FE
 save_foldername:
   desc: null
-  value: ../logs/wandb/run-20220629_151538-3prscdc0/files
+  value: ../logs/wandb/run-20220704_170954-49zw9eci/files
 save_periodic:
   desc: null
   value: false
@@ -143,7 +142,7 @@ seed:
   value: 7
 state_dim:
   desc: null
-  value: 5
+  value: 9
 tau:
   desc: null
   value: 0.005
