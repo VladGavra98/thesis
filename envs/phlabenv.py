@@ -293,7 +293,7 @@ class CitationEnv(BaseEnv):
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action, tau = 0.9)
+        u = self.filter_action(action, tau = 1)
         self.last_u = u
 
         # Step the system
