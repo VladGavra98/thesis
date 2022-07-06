@@ -57,7 +57,8 @@ class Agent:
             self.noise_process = mod_utils.GaussianNoise(args.action_dim, sd = args.noise_sd)
 
         # Initialise evolutionary loop
-        self.evolver = utils_ne.SSNE(self.args, self.rl_agent.critic, self.evaluate)
+        if len(self.pop):
+            self.evolver = utils_ne.SSNE(self.args, self.rl_agent.critic, self.evaluate)
 
         # Testing
         self.validation_tests = 5
@@ -193,15 +194,12 @@ class Agent:
 
         return test_score,test_sd, episode
 
-    def get_champ_history(self, episode : Episode):
+    def get_history(self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
         ref_values = np.array([[ref(t_i) for t_i in time] for ref in episode.ref_signals]).transpose()
         reward_lst = np.asarray(episode.reward_lst).reshape((len(episode.state_history),1))
 
-        self.champion_history = np.concatenate((ref_values, \
-                                                episode.actions,\
-                                                episode.state_history, \
-                                                reward_lst), axis = 1)
+        return np.concatenate((ref_values, episode.actions,episode.state_history,reward_lst), axis = 1)
 
     def train(self):
         self.gen_frames = 0
@@ -245,7 +243,7 @@ class Agent:
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3) ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
-        if len(self.pop) < 10:
+        if len(self.pop) == 0:
             print('Info: playing extra episodes with action nosie for RL training')
             for _ in range(10):
                 episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
@@ -253,13 +251,15 @@ class Agent:
 
             ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
-        self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
+        self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
         # Gradient updates of RL actor and critic
         rl_train_scores = self.train_rl()
 
         # Validate rl separately
-        rl_reward,rl_std, _ = self.validate_actor(self.rl_agent)
+        rl_reward,rl_std, rl_episode = self.validate_actor(self.rl_agent)
+
+        self.rl_history = self.get_history(rl_episode)
 
         ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''
         if self.iterations % self.args.rl_to_ea_synch_period == 0 and len(self.pop):
@@ -304,49 +304,30 @@ class Agent:
         pop_dict = {}
 
         # Save gentic popualtion
-        for i, ind in enumerate(self.pop):
-            pop_dict[f'actor_{i}'] = ind.actor.state_dict()
-        torch.save(pop_dict, os.path.join(
-            parameters.save_foldername, 'evo_nets.pkl'))
+        if len(self.pop):
+            for i, ind in enumerate(self.pop):
+                pop_dict[f'actor_{i}'] = ind.actor.state_dict()
+            torch.save(pop_dict, os.path.join(
+                parameters.save_foldername, 'evo_nets.pkl'))
 
-        # Save best performing agent separately:
-        if elite_index is not None:
+            # Save best performing agent separately:
             torch.save(self.pop[elite_index].actor.state_dict(), 
                         os.path.join(parameters.save_foldername,'elite_net.pkl'))
 
+            # Save state history of the champion
+            filename = 'statehistory_episode' + str(self.num_episodes) + '.txt'
+            np.savetxt(os.path.join(parameters.save_foldername,filename),
+                self.champion_history, header = str(self.num_episodes))
+
+        
         # Save RL actor seprately:
         torch.save(self.rl_agent.actor.state_dict(), 
                         os.path.join(parameters.save_foldername,'rl_net.pkl'))
 
-        # Save state history of the champion
-        filename = 'statehistory_episode' + str(self.num_episodes) + '.txt'
+        filename = 'rl_statehistory_episode' + str(self.num_episodes) + '.txt'
         np.savetxt(os.path.join(parameters.save_foldername,filename),
-            self.champion_history, header = str(self.num_episodes))
+                self.rl_history, header = str(self.num_episodes))
 
         # NOTE might want to save RL state-history for future cheks
         print('> state hitostory in ' + str(filename) + '\n')
         print("Progress Saved")
-
-
-# class Archive:
-#     """A record of past behaviour characterisations (BC) in the population"""
-
-#     def __init__(self, args):
-#         self.args = args
-#         # Past behaviours
-#         self.bcs = []
-
-#     def add_bc(self, bc):
-#         if len(self.bcs) + 1 > self.args.archive_size:
-#             self.bcs = self.bcs[1:]
-#         self.bcs.append(bc)
-
-#     def get_novelty(self, this_bc):
-#         if self.size() == 0:
-#             return np.array(this_bc).T @ np.array(this_bc)
-#         distances = np.ravel(distance.cdist(np.expand_dims(this_bc, axis=0), np.array(self.bcs), metric='sqeuclidean'))
-#         distances = np.sort(distances)
-#         return distances[:self.args.ns_k].mean()
-
-#     def size(self):
-#         return len(self.bcs)

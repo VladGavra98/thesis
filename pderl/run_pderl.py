@@ -11,7 +11,7 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_episodes = 400
+num_episodes = 150
 num_frames = num_episodes * 2000
 
 # -store_true means that it becomes true if I mention the argument
@@ -47,7 +47,7 @@ parser.add_argument('-test_operators', help='Test the variational operators', ac
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
-                    type=int, default=num_episodes//10)
+                    type=int, default=num_episodes//20)
 
 
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # strat trackers
     if cla.should_log:
         print('\033[1;32m WandB logging started')
-        run = wandb.init(project="pderl_phlab",
+        run = wandb.init(project="pderl_phlab_longitudinal",
                         entity="vgavra",
                         dir='../logs',
                         name=cla.run_name,
@@ -119,21 +119,20 @@ if __name__ == "__main__":
         # Update loggers:
         stats['frames'] = agent.num_frames; stats['episodes'] = agent.num_episodes
         stats['time'] = time.time() - start_time
-        stats['rl_elite_fraction'] = agent.evolver.selection_stats['elite'] / \
-            agent.evolver.selection_stats['total']
-        stats['rl_selected_fraction'] = agent.evolver.selection_stats['selected'] / \
-            agent.evolver.selection_stats['total']
-        stats['rl_discarded_fraction'] = agent.evolver.selection_stats['discarded'] / \
-            agent.evolver.selection_stats['total']
-        
+        if len(agent.pop):
+            stats['rl_elite_fraction'] = agent.evolver.selection_stats['elite'] / \
+                agent.evolver.selection_stats['total']
+            stats['rl_selected_fraction'] = agent.evolver.selection_stats['selected'] / \
+                agent.evolver.selection_stats['total']
+            stats['rl_discarded_fraction'] = agent.evolver.selection_stats['discarded'] / \
+                agent.evolver.selection_stats['total']
+            
         if cla.should_log:
             wandb.log(stats)                # main call to wandb logger
 
-        # Get index of best actor
-        elite_index = stats['elite_index']  # champion index
-
         # Save Policy
         if cla.should_log and agent.num_episodes > next_save:
+            elite_index = stats['elite_index']  # champion index
             next_save += parameters.next_save
             agent.save_agent(parameters, elite_index)
 

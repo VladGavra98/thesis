@@ -113,7 +113,7 @@ class CitationEnv(BaseEnv):
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1                  # theta
-            self.obs_idx = [1,3,4]              # q, V, alpha
+            self.obs_idx   = [1]              # q, V, alpha
 
         elif 'attitude' in configuration.lower():
             print('Attitude control.')
@@ -201,7 +201,7 @@ class CitationEnv(BaseEnv):
                         smooth_width=3.0,
                         n_levels=10,
                         vary_timings=0.1) \
-                        + signals.Const(0.,self.t_max, self.theta)
+                        + signals.Const(0.,self.t_max, value = 0.21)
             self.ref = [ref]
 
         elif self.n_actions == 3:
@@ -293,11 +293,12 @@ class CitationEnv(BaseEnv):
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action, tau = 1)
+        u = self.filter_action(action, tau = 1.)
         self.last_u = u
 
         # Step the system
-        citation_input = np.pad(action,(0, self.n_actions_full - self.n_actions), 
+        citation_input = np.pad(action,
+                                (0, self.n_actions_full - self.n_actions), 
                                 'constant', constant_values = (0.))
         self.x = citation.step(citation_input)
         
@@ -314,9 +315,9 @@ class CitationEnv(BaseEnv):
         if self.t >= self.t_max or np.abs(self.theta) > self.max_theta \
             or np.abs(self.phi) > self.max_phi  or self.H < 200:
             if np.any(np.isnan(self.x)):
-                print('NaN enountered:', self.x)
+                print('NaN encountered: ', self.x)
             is_done = True
-            reward += (self.t_max - self.t) * self.reward_scale * 200  # negative reward for dying soon
+            reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
    
         # info:
         info = {
@@ -350,11 +351,9 @@ class Actor():
 
 def evaluate(verbose : bool = False):
     """ Simulate one episode """
-
     # reset env
     done = False
     obs = env.reset()
-
 
     # PID gains
     p, i, d = 20, 6,5

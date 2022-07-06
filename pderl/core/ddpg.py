@@ -15,15 +15,19 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         self.args = args
 
-        l1 = 200; l2 = 300; l3 = l2
+        l1 = 32; l2 = 64; l3 = int(l2/2)
 
-        # Construct input interface (Hidden Layer 1)
-        self.w_state_l1 = nn.Linear(args.state_dim, l1)
-        self.w_action_l1 = nn.Linear(args.action_dim, l1)
+        # Input layer
+        self.w_state = nn.Linear(args.state_dim, l1)
+        self.w_action = nn.Linear(args.action_dim, l1)
 
-        # Hidden Layer 2
-        self.w_l2 = nn.Linear(2*l1, l2)
-        self.lnorm2 = LayerNorm(l2)
+        # Hidden Layer 1
+        self.w_l1 = nn.Linear(2*l1, l2)
+        self.lnorm1 = LayerNorm(l2)
+
+        # Hidden Layer 1
+        self.w_l2 = nn.Linear(l2, l3)
+        self.lnorm2 = LayerNorm(l3)
 
         # Out
         self.w_out = nn.Linear(l3, 1)
@@ -34,10 +38,15 @@ class Critic(nn.Module):
 
     def forward(self, input, action):
 
-        # Hidden Layer 1 (Input Interface)
-        out_state = F.elu(self.w_state_l1(input))
-        out_action = F.elu(self.w_action_l1(action))
+        # Input Interface
+        out_state = F.elu(self.w_state(input))
+        out_action = F.elu(self.w_action(action))
         out = torch.cat((out_state, out_action), 1)
+
+        # Hidden Layer 2
+        out = self.w_l1(out)
+        out = self.lnorm1(out)
+        out = F.elu(out)
 
         # Hidden Layer 2
         out = self.w_l2(out)
@@ -58,11 +67,11 @@ class DDPG(object):
 
         self.actor = Actor(args, init=True)
         self.actor_target = Actor(args, init=True)
-        self.actor_optim = Adam(self.actor.parameters(), lr=0.5e-3)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-3)
 
         self.critic = Critic(args)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=2e-3)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()

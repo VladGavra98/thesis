@@ -45,7 +45,7 @@ class Parameters:
         self.gamma = 0.98
         self.tau = 0.005   
         self.seed = cla.seed
-        self.batch_size = 128
+        self.batch_size = 256
         self.frac_frames_train = 1
         self.use_done_mask = True
         self.buffer_size = 200_000  #50000
@@ -53,7 +53,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 64  # NOTE  has been changed from 128
+        self.hidden_size = 64
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -64,37 +64,40 @@ class Parameters:
         # self.total_steps = self.num_frames
 
         # ==================================    TD3 Params  =============================================
-        self.policy_update_freq = 2    # minimum for TD3
+        if not self.use_ddpg:
+            self.policy_update_freq = 2    # minimum for TD3
         self.noise_clip         = 0.5  # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
-        # Num. of trials during evaluation step
-        self.num_evals = 3
-
         # Number of actors in the population
         self.pop_size = 0
-
-        # Elitism Rate - % of elites 
-        self.elite_fraction = 0.2
- 
-        # Mutation and crossover
-        self.crossover_prob = 0.0
-        self.mutation_prob = 0.9
-        self.mutation_mag = cla.mut_mag
-        self.mutation_batch_size = 256
-        self.proximal_mut = cla.proximal_mut
-        self.distil = cla.distil
-        self.distil_type = cla.distil_type
-        self._verbose_mut = cla.verbose_mut
-        self._verbose_crossover = cla.verbose_crossover
-
+        
         # Genetic memory size
         self.individual_bs = 10_000
+        if self.pop_size:
+            # Num. of trials during evaluation step
+            self.num_evals = 3
 
-        # Variation operator statistics
-        self.opstat = cla.opstat
-        self.opstat_freq = 1
-        self.test_operators = cla.test_operators
+            # Elitism Rate - % of elites 
+            self.elite_fraction = 0.2
+    
+            # Mutation and crossover
+            self.crossover_prob = 0.0
+            self.mutation_prob = 0.9
+            self.mutation_mag = cla.mut_mag
+            self.mutation_batch_size = 256
+            self.proximal_mut = cla.proximal_mut
+            self.distil = cla.distil
+            self.distil_type = cla.distil_type
+            self._verbose_mut = cla.verbose_mut
+            self._verbose_crossover = cla.verbose_crossover
+
+
+
+            # Variation operator statistics
+            self.opstat = cla.opstat
+            self.opstat_freq = 1
+            self.test_operators = cla.test_operators
 
         # Save Results
         self.state_dim = None   # To be initialised externally

@@ -1,0 +1,112 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.16
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.8.10
+    start_time: 1657040448
+    t:
+      1:
+      - 1
+      - 55
+      3:
+      - 13
+      - 16
+      4: 3.8.10
+      5: 0.12.16
+      8:
+      - 5
+action_dim:
+  desc: null
+  value: 1
+alpha:
+  desc: null
+  value: 0.7
+batch_size:
+  desc: null
+  value: 256
+beta_zero:
+  desc: null
+  value: 0.5
+buffer_size:
+  desc: null
+  value: 200000
+device:
+  desc: null
+  value: cuda
+env_name:
+  desc: null
+  value: PHlab_symmetric
+frac_frames_train:
+  desc: null
+  value: 1
+gamma:
+  desc: null
+  value: 0.98
+hidden_size:
+  desc: null
+  value: 64
+individual_bs:
+  desc: null
+  value: 10000
+learn_start:
+  desc: null
+  value: 1564.5
+next_save:
+  desc: null
+  value: 20
+noise_clip:
+  desc: null
+  value: 0.5
+noise_sd:
+  desc: null
+  value: 0.1
+ns:
+  desc: null
+  value: false
+ns_epochs:
+  desc: null
+  value: 10
+num_frames:
+  desc: null
+  value: 800000
+per:
+  desc: null
+  value: false
+pop_size:
+  desc: null
+  value: 0
+replace_old:
+  desc: null
+  value: true
+rl_to_ea_synch_period:
+  desc: null
+  value: 1
+save_foldername:
+  desc: null
+  value: ./logs/tmp/
+save_periodic:
+  desc: null
+  value: false
+seed:
+  desc: null
+  value: 7
+state_dim:
+  desc: null
+  value: 5
+tau:
+  desc: null
+  value: 0.005
+use_ddpg:
+  desc: null
+  value: true
+use_done_mask:
+  desc: null
+  value: true
+use_ounoise:
+  desc: null
+  value: false
