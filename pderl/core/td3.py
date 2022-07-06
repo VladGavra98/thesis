@@ -91,12 +91,12 @@ class TD3(object):
         # Initialize actor
         self.actor = Actor(args, init=True)
         self.actor_target = Actor(args, init=True)
-        self.actor_optim = Adam(self.actor.parameters(), lr=0.5e-3)
+        self.actor_optim = Adam(self.actor.parameters(), lr = self.args.lr)
 
         # Initialise critics
         self.critic = Critic(args)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr = self.args.lr)
 
         # Initliase loss
         self.gamma = args.gamma; self.tau = self.args.tau

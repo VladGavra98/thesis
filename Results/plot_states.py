@@ -26,7 +26,7 @@ savefig = True
 # nice purple: '#988ED5'
 
 # Load state history data:
-logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
+# logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
 logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/latest-run/files/')
 
 def plot_epsiode_data_champ(flst, ep_num_lst, idx):
@@ -139,7 +139,7 @@ if __name__ == '__main__':
                 flst.append(file)
 
 
-    idx = 0
+    idx = -1
     if len(flst):
         plot_epsiode_data_champ(flst, ep_num_lst, idx)
 

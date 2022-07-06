@@ -25,12 +25,9 @@ class BaseEnv(gym.Env, ABC):
     def observation_space(self) -> Box:
         raise NotImplementedError
 
-
     @abstractmethod
     def get_reference_value(self) -> List[float]:
         raise NotImplementedError
-
-    # todo: The controller state and error should be vectors
 
     @abstractmethod
     def get_controlled_state(self) -> List[float]:
@@ -186,7 +183,6 @@ class CitationEnv(BaseEnv):
     @property
     def H(self)-> float:
         return self.x[9] 
-
     @property
     def nz(self) -> float:
         """ Load factor [g] """
@@ -231,8 +227,7 @@ class CitationEnv(BaseEnv):
         return np.asarray([np.deg2rad(_signal(self.t)) for _signal in self.ref])
 
     def get_controlled_state(self) -> float:
-        _crtl= np.asarray([self.theta,  self.phi, self.beta])
-  
+        _crtl = np.asarray([self.theta,  self.phi, self.beta])
         return _crtl[:self.n_actions]
 
     def calc_error(self) -> np.array:
@@ -254,6 +249,15 @@ class CitationEnv(BaseEnv):
     def check_envelope_bounds():
         raise NotImplementedError
 
+    def pad_action(self, action : np.ndarray) -> np.ndarray:
+        """ Pad the non-calculated deflection valeus with 0. 
+        """
+        citation_input = np.pad(action,
+                                (0, self.n_actions_full - self.n_actions), 
+                                'constant', 
+                                constant_values = (0.)) 
+        return citation_input
+
     def reset (self, **kwargs) -> np.ndarray:
         # Reset time
         self.t = 0.0
@@ -265,9 +269,7 @@ class CitationEnv(BaseEnv):
         self.last_u = np.zeros(self.action_space.shape[0])
 
         # Init state vector and observation vector
-        _input = np.pad(self.last_u,
-                        (0, self.n_actions_full - self.n_actions), 
-                        'constant', constant_values = (0.))
+        _input = self.pad_action(self.last_u)
         self.x = citation.step(_input)
 
         # Randomize reference signal sequence
@@ -296,11 +298,8 @@ class CitationEnv(BaseEnv):
         u = self.filter_action(action, tau = 1.)
         self.last_u = u
 
-        # Step the system
-        citation_input = np.pad(action,
-                                (0, self.n_actions_full - self.n_actions), 
-                                'constant', constant_values = (0.))
-        self.x = citation.step(citation_input)
+        _input = self.pad_action(action)
+        self.x = citation.step(_input)
         
         # Reward using clipped error
         reward   = self.get_reward()
@@ -311,7 +310,6 @@ class CitationEnv(BaseEnv):
         # Step time
         self.t  += self.dt
 
-        # Check if Done:
         if self.t >= self.t_max or np.abs(self.theta) > self.max_theta \
             or np.abs(self.phi) > self.max_phi  or self.H < 200:
             if np.any(np.isnan(self.x)):
@@ -325,9 +323,12 @@ class CitationEnv(BaseEnv):
             "x":   self.x,
             "t":   self.t,
         }
-
         return self.obs, reward, is_done, info
 
+    # def check_envelope_bounds(self, reward):
+    #     # Check if Done:
+ 
+    #     return is_done
 
     def render(self, **kwargs):
         """ just to make the linter happy (we are deriving from gym.Env)"""
@@ -338,15 +339,6 @@ class CitationEnv(BaseEnv):
         """ Terminate the simulink thing."""
         citation.terminate()
 
-
-class Actor():
-    # NOTE for testing the environment implementation
-    def __init__(self,state_dim, action_dim):
-        # random linear policy
-        self.policy = np.random.rand(action_dim, state_dim,)
-
-    def select_action(self,state):
-        return (self.policy @ state)/100
 
 
 def evaluate(verbose : bool = False):
@@ -410,8 +402,7 @@ if __name__=='__main__':
 
     # init env an actor
     env = config.select_env('phlab_attitude')
-    actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
-    
+
     
     trials = 2
     verbose = False

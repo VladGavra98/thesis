@@ -43,6 +43,7 @@ class Parameters:
         self.use_ddpg = cla.use_ddpg   # default should be False
 
         self.gamma = 0.98
+        self.lr  = 1e-3
         self.tau = 0.005   
         self.seed = cla.seed
         self.batch_size = 256
@@ -53,7 +54,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 32
+        self.hidden_size = 64
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -66,6 +67,7 @@ class Parameters:
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 2      # minimum for TD3
+            self.lr  = 2e-3                # overwrite lr for actor & critic 
         self.noise_clip = 0.5                # default for TD3
 
         # =================================   NeuroEvolution Params =====================================

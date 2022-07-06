@@ -3,10 +3,9 @@ import torch.nn as nn
 from torch.optim import Adam
 from torch.nn import functional as F
 from core import replay_memory
-import numpy as np
 
 from core.genetic_agent import Actor
-from core.mod_utils import hard_update, soft_update, LayerNorm, GaussianNoise, OUNoise
+from core.mod_utils import hard_update, soft_update, LayerNorm
 
 
 class Critic(nn.Module):
@@ -67,11 +66,11 @@ class DDPG(object):
 
         self.actor = Actor(args, init=True)
         self.actor_target = Actor(args, init=True)
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-3)
+        self.actor_optim = Adam(self.actor.parameters(), lr = self.args.lr)
 
         self.critic = Critic(args)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=2e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr = self.args.lr)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()
