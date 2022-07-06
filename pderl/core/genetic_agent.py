@@ -49,7 +49,7 @@ class GeneticAgent:
         #  Select best behaving pparent based on Q-filtering:
         eps = 0.0  # selection threshold -- how much better one action is wrt the other
         action_batch = torch.cat((p1_action[p1_q - p2_q > eps], p2_action[p2_q - p1_q >= eps])).detach()
-        state_batch = torch.cat((state_batch[p1_q - p2_q > eps], state_batch[p2_q - p1_q >= eps]))
+        state_batch  = torch.cat((state_batch[p1_q - p2_q > eps], state_batch[p2_q - p1_q >= eps]))
         actor_action = self.actor(state_batch)
 
         #  Actor update
@@ -71,7 +71,7 @@ class Actor(nn.Module):
         l1 = args.hidden_size; l2 = args.hidden_size; l3 = l2
 
         # Construct Hidden Layer 1
-        self.bnorm = LayerNorm(args.state_dim)  # batch norm
+        self.bnorm = nn.BatchNorm1d(args.state_dim)  # batch norm
         self.w_l1 = nn.Linear(args.state_dim, l1)
 
         # Hidden Layer 2
@@ -93,7 +93,7 @@ class Actor(nn.Module):
     def forward(self, input):
 
         # Hidden Layer 1
-        input = self.bnorm(input)
+        # input = self.bnorm(input)
         out = self.w_l1(input)
         out = self.lnorm1(out)
         out = out.tanh()

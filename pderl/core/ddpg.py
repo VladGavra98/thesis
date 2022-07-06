@@ -18,11 +18,11 @@ class Critic(nn.Module):
         l1 = 32; l2 = 64; l3 = int(l2/2)
 
         # Input layer
-        self.w_state = nn.Linear(args.state_dim, l1)
-        self.w_action = nn.Linear(args.action_dim, l1)
+        self.bnorm = nn.BatchNorm1d(args.state_dim + args.action_dim)  # batch norm
+        self.w_input = nn.Linear(args.state_dim + args.action_dim, l1)
 
         # Hidden Layer 1
-        self.w_l1 = nn.Linear(2*l1, l2)
+        self.w_l1 = nn.Linear(l1, l2)
         self.lnorm1 = LayerNorm(l2)
 
         # Hidden Layer 1
@@ -36,13 +36,13 @@ class Critic(nn.Module):
 
         self.to(self.args.device)
 
-    def forward(self, input, action):
+    def forward(self, state, action):
 
         # Input Interface
-        out_state = F.elu(self.w_state(input))
-        out_action = F.elu(self.w_action(action))
-        out = torch.cat((out_state, out_action), 1)
-
+        input = torch.cat((state, action), 1)
+        input = self.bnorm(input)
+        out = F.elu(self.w_input(input))
+  
         # Hidden Layer 2
         out = self.w_l1(out)
         out = self.lnorm1(out)

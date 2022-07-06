@@ -48,25 +48,25 @@ class Parameters:
         self.batch_size = 256
         self.frac_frames_train = 1
         self.use_done_mask = True
-        self.buffer_size = 200_000  #50000
+        self.buffer_size = 200_000         
         self.noise_sd = 0.1
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 64
+        self.hidden_size = 32
 
         # Prioritised Experience Replay
         self.per = cla.per
         self.replace_old = True
         self.alpha = 0.7
         self.beta_zero = 0.5
-        self.learn_start = (1 + self.buffer_size / self.batch_size) * 2
+        self.learn_start = 2000              # [frames] 
         # self.total_steps = self.num_frames
 
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
-            self.policy_update_freq = 2    # minimum for TD3
-        self.noise_clip         = 0.5  # default for TD3
+            self.policy_update_freq = 2      # minimum for TD3
+        self.noise_clip = 0.5                # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
         # Number of actors in the population

@@ -26,8 +26,8 @@ savefig = True
 # nice purple: '#988ED5'
 
 # Load state history data:
+logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
 logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/latest-run/files/')
-
 
 def plot_epsiode_data_champ(flst, ep_num_lst, idx):
     flst = [flst[i] for i in np.argsort(ep_num_lst)]
@@ -44,11 +44,11 @@ def plot_epsiode_data_champ(flst, ep_num_lst, idx):
     fig.suptitle(f'Episdoe {ep_num_lst[idx]}')
 
 
-    # axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
     axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = r'$\theta_{ref}$')
     axs[0,0].set_ylabel(r'$\theta~[deg],q~[deg/s]$')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
 
     axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$')
     axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$')
@@ -80,7 +80,10 @@ def plot_epsiode_data_champ(flst, ep_num_lst, idx):
     plt.tight_layout()
 
 def plot_epsiode_data_rl(flst, ep_num_lst, idx):
+    
     flst = [flst[i] for i in np.argsort(ep_num_lst)]
+    ep_num_lst = np.sort(ep_num_lst)
+
     episode_file = open(logfolder / Path(flst[idx]),encoding = 'utf-8')
 
     # episode_num = episode_file.readline().strip('# ')
@@ -93,11 +96,11 @@ def plot_epsiode_data_rl(flst, ep_num_lst, idx):
     fig, axs = plt.subplots(3,2)
     fig.suptitle(f'Episdoe {ep_num_lst[idx]}')
 
-    # axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
     axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = r'$\theta_{ref}$')
     axs[0,0].set_ylabel(r'$\theta~[deg],q~[deg/s]$')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
 
 
     axs[1,0].plot(time,x_lst[:,3], label = r'$V$')
@@ -114,7 +117,7 @@ def plot_epsiode_data_rl(flst, ep_num_lst, idx):
     axs[1,1].set_ylabel('Reward [-]'); axs[1,1].set_xlabel('Time [s]')
 
 
-    print('Validation fitness of champion: ' , sum(rewards))
+    print('Validation fitness: ' , sum(rewards))
     for i in range(3):
         for j in range(2):
             axs[i,j].set_xlabel('Time [s]')
@@ -135,10 +138,8 @@ if __name__ == '__main__':
             else:
                 flst.append(file)
 
-    ep_num_lst = sorted(ep_num_lst)
-    print(ep_num_lst)
 
-    idx = -1
+    idx = 0
     if len(flst):
         plot_epsiode_data_champ(flst, ep_num_lst, idx)
 

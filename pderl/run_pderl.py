@@ -11,7 +11,7 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_episodes = 150
+num_episodes = 200
 num_frames = num_episodes * 2000
 
 # -store_true means that it becomes true if I mention the argument

@@ -9,7 +9,7 @@ from core.mod_utils import hard_update, soft_update, LayerNorm
 
 from typing import Tuple, Dict, List
 
-MAX_GRAD_NORM = 10
+MAX_GRAD_NORM = 5
 
 class Critic(nn.Module):
 
@@ -19,10 +19,10 @@ class Critic(nn.Module):
 
         # layer sizes
         # l1 = 200; l2 = 300; l3 = l2   
-        l1 =128; l2 = 64;
+        l1 =32; l2 = 64;
 
         # Critic 1
-        self.bnorm_1 = LayerNorm(args.state_dim + args.action_dim)  # batch norm
+        self.bnorm_1 = nn.BatchNorm1d(args.state_dim + args.action_dim)  # batch norm
         self.l1_1 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_1 = LayerNorm(l1)
         self.l2_1 = nn.Linear(l1, l2)
@@ -30,7 +30,7 @@ class Critic(nn.Module):
         self.lout_1 = nn.Linear(l2, 1)
 
         # Critic 2
-        self.bnorm_2 = LayerNorm(args.state_dim + args.action_dim)
+        self.bnorm_2 = nn.BatchNorm1d(args.state_dim + args.action_dim)  # batch norm
         self.l1_2 = nn.Linear(args.state_dim + args.action_dim, l1)
         self.lnorm1_2 = LayerNorm(l1)
         self.l2_2 = nn.Linear(l1, l2)
@@ -50,8 +50,9 @@ class Critic(nn.Module):
         input = self.bnorm_1(input)
 
         # hidden Layer 1 (Input Interface)
-        out = F.elu(self.l1_1(input))
+        out = self.l1_1(input)
         out = self.lnorm1_1(out)
+        out = F.elu(out)
 
         # hidden Layer 2
         out = self.l2_1(out)
@@ -66,8 +67,9 @@ class Critic(nn.Module):
         input = torch.cat((state,action), 1)
         input = self.bnorm_2(input)
 
-        out = F.elu(self.l1_2(input))
+        out = self.l1_2(input)
         out = self.lnorm1_2(out)
+        out = F.elu(out)
 
         # hidden Layer 2
         out = self.l2_2(out)
@@ -148,8 +150,8 @@ class TD3(object):
             self.actor_optim.zero_grad()
 
             # retrieve value of the critics
-            est_q1,est_q2 = self.critic.forward(state_batch, self.actor.forward(state_batch))
-            policy_grad_loss = -torch.mean(torch.min(est_q1, est_q2))   # add minus to make it a loss
+            est_q1,_ = self.critic.forward(state_batch, self.actor.forward(state_batch))
+            policy_grad_loss = -torch.mean(est_q1)                        # add minus to make it a loss
 
             # backprop
             policy_grad_loss.backward()
