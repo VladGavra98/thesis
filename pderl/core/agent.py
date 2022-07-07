@@ -194,7 +194,7 @@ class Agent:
 
         return test_score,test_sd, episode
 
-    def get_history(self, episode : Episode) -> np.ndarray:
+    def get_history (self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
         ref_values = np.array([[ref(t_i) for t_i in time] for ref in episode.ref_signals]).transpose()
         reward_lst = np.asarray(episode.reward_lst).reshape((len(episode.state_history),1))
@@ -236,7 +236,7 @@ class Agent:
 
             # Validation test for NeuroEvolution 
             test_score, test_sd, last_episode = self.validate_actor(champion)
-            self.get_champ_history(last_episode)
+            self.champion_history = self.get_history(last_episode)
 
             # NeuroEvolution's probabilistic selection and recombination step
             elite_index = self.evolver.epoch(self.pop, rewards)
@@ -301,10 +301,9 @@ class Agent:
             parameters (object): Container class of the trainign hyperparameters.
             elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
         """
-        pop_dict = {}
-
         # Save gentic popualtion
         if len(self.pop):
+            pop_dict = {}
             for i, ind in enumerate(self.pop):
                 pop_dict[f'actor_{i}'] = ind.actor.state_dict()
             torch.save(pop_dict, os.path.join(
@@ -329,5 +328,5 @@ class Agent:
                 self.rl_history, header = str(self.num_episodes))
 
         # NOTE might want to save RL state-history for future cheks
-        print('> state hitostory in ' + str(filename) + '\n')
+        print('> state history in ' + str(filename) + '\n')
         print("Progress Saved")

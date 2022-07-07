@@ -72,7 +72,7 @@ class Parameters:
 
         # =================================   NeuroEvolution Params =====================================
         # Number of actors in the population
-        self.pop_size = 0
+        self.pop_size = 10
         
         # Genetic memory size
         self.individual_bs = 10_000
