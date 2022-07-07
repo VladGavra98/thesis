@@ -41,13 +41,13 @@ class Parameters:
 
         # ==================================  DDPG legacy Params =============================================
         self.use_ddpg = cla.use_ddpg   # default should be False
+        self.frac_frames_train = 1
 
         self.gamma = 0.98
         self.lr    = 1e-3
         self.tau   = 0.005   
         self.seed  = cla.seed
         self.batch_size = 256
-        self.frac_frames_train = 1
         self.use_done_mask = True
         self.buffer_size = 200_000         
         self.noise_sd = 0.1

@@ -107,7 +107,7 @@ class TD3(object):
         hard_update(self.critic_target, self.critic)
 
 
-    def update_parameters(self, batch, iteration : int) -> Tuple[float,float]:
+    def update_parameters(self, batch, iteration : int, champion_policy = None) -> Tuple[float,float]:
         pgl = None
         state_batch, action_batch, next_state_batch, reward_batch, done_batch = batch
 
@@ -159,8 +159,10 @@ class TD3(object):
             self.actor_optim.step()
 
             # smooth target updates 
-            soft_update(self.actor_target, self.actor, self.tau)
-            # soft_update(self.actor_target, )
+            if champion_policy is not None:
+                soft_update(self.actor_target, champion_policy, self.tau)
+            else:
+                soft_update(self.actor_target, self.actor, self.tau)
             soft_update(self.critic_target, self.critic, self.tau)
 
             pgl = policy_grad_loss.data.cpu().numpy()

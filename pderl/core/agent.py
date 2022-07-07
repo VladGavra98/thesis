@@ -72,7 +72,8 @@ class Agent:
 
         # Trackers
         self.num_episodes = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
-        self.rl_iteration = 0 # for TD3 delyed policy updates
+        self.rl_iteration = 0            # for TD3 delyed policy updates
+        self.champion : genetic_agent = None
         self.champion_history : np.ndarray = None
 
 
@@ -169,7 +170,7 @@ class Agent:
                 self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
 
-                pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration)
+                pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion.actor)
 
                 if pgl is not None:
                     pgs_obj.append(-pgl)
@@ -232,7 +233,7 @@ class Agent:
             best_train_fitness  = np.max(rewards)              # champion - highest reward
             worst_train_fitness = np.min(rewards)
             population_avg      = np.average(rewards)          # population_avg 
-            self.champion            = self.pop[np.argmax(rewards)]
+            self.champion       = self.pop[np.argmax(rewards)]
 
             # Validation test for NeuroEvolution 
             test_score, test_sd, last_episode = self.validate_actor(self.champion)
