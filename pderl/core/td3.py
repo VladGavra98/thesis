@@ -160,6 +160,7 @@ class TD3(object):
 
             # smooth target updates 
             soft_update(self.actor_target, self.actor, self.tau)
+            # soft_update(self.actor_target, )
             soft_update(self.critic_target, self.critic, self.tau)
 
             pgl = policy_grad_loss.data.cpu().numpy()

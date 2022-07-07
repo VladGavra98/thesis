@@ -9,7 +9,7 @@ import torch
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
 from tqdm import tqdm
-import os, time
+import os
 
 @dataclass                                                                                                                                      
 class Episode: 
@@ -232,10 +232,10 @@ class Agent:
             best_train_fitness  = np.max(rewards)              # champion - highest reward
             worst_train_fitness = np.min(rewards)
             population_avg      = np.average(rewards)          # population_avg 
-            champion            = self.pop[np.argmax(rewards)]
+            self.champion            = self.pop[np.argmax(rewards)]
 
             # Validation test for NeuroEvolution 
-            test_score, test_sd, last_episode = self.validate_actor(champion)
+            test_score, test_sd, last_episode = self.validate_actor(self.champion)
             self.champion_history = self.get_history(last_episode)
 
             # NeuroEvolution's probabilistic selection and recombination step

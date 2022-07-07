@@ -43,9 +43,9 @@ class Parameters:
         self.use_ddpg = cla.use_ddpg   # default should be False
 
         self.gamma = 0.98
-        self.lr  = 1e-3
-        self.tau = 0.005   
-        self.seed = cla.seed
+        self.lr    = 1e-3
+        self.tau   = 0.005   
+        self.seed  = cla.seed
         self.batch_size = 256
         self.frac_frames_train = 1
         self.use_done_mask = True
@@ -67,7 +67,7 @@ class Parameters:
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 2      # minimum for TD3
-            self.lr  = 2e-3                # overwrite lr for actor & critic 
+            self.lr  = 2e-3                  # overwrite lr for actor & critic 
         self.noise_clip = 0.5                # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
@@ -77,6 +77,9 @@ class Parameters:
         # Genetic memory size
         self.individual_bs = 10_000
         if self.pop_size:
+            # increase buffer size for more experiences
+            self.buffer_size*= self.pop_size//2
+
             # Num. of trials during evaluation step
             self.num_evals = 3
 
@@ -86,14 +89,13 @@ class Parameters:
             # Mutation and crossover
             self.crossover_prob = 0.0
             self.mutation_prob = 0.9
-            self.mutation_mag = cla.mut_mag
+            self.mutation_mag = 0.1
             self.mutation_batch_size = 256
             self.proximal_mut = cla.proximal_mut
             self.distil = cla.distil
             self.distil_type = cla.distil_type
             self._verbose_mut = cla.verbose_mut
             self._verbose_crossover = cla.verbose_crossover
-
 
 
             # Variation operator statistics

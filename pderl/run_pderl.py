@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-should_log', help='Wether the WandB loggers are used', action='store_true')
 parser.add_argument('-run_name', default='test', type=str)
 parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2) (PHLab)',type=str, default='PHlab_attitude')
-parser.add_argument('-use_ddpg', help='Wether to use DDPG or TD3 for the RL part. Defaults to TD3',action='store_true', default=False)
+parser.add_argument('-use_ddpg', help='Wether to use DDPG in place of TD3 for the RL part.',action='store_true')
 parser.add_argument('-frames', help='Number of frames to learn from', default=num_frames, type=int)
 
 parser.add_argument('-seed', help='Random seed to be used',type=int, default=7)
@@ -37,7 +37,6 @@ parser.add_argument('-distil', help='Use distilation crossover',
 parser.add_argument('-distil_type', help='Use distilation crossover. Choices: (fitness) (distance)',
                     type=str, default='distance')
 parser.add_argument('-per', help='Use Prioritised Experience Replay', action='store_true')
-parser.add_argument('-mut_mag', help='The magnitude of the mutation', type=float, default=0.05)
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover',help='Make crossovers verbose', action='store_true')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
@@ -46,7 +45,7 @@ parser.add_argument('-test_operators', help='Test the variational operators', ac
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
-                    type=int, default=num_episodes//20)
+                    type=int, default=num_episodes//15)
 
 
 
