@@ -116,7 +116,14 @@ class PrioritizedReplayMemory(object):
     def beta_by_frame(self, frame_idx):
         return min(1.0, self.beta_start + frame_idx * (1.0 - self.beta_start) / self.beta_frames)
 
-    def push(self, transition: Transition):
+    def add(self, *args):
+
+        reshaped_args = []
+        for arg in args:
+            reshaped_args.append(np.reshape(arg, (1, -1)))
+
+        transition = Transition(*reshaped_args)
+
         max_prio = self.priorities.max() if self.buffer else 1.0 ** self.prob_alpha
 
         if len(self.buffer) < self.capacity:
@@ -152,7 +159,15 @@ class PrioritizedReplayMemory(object):
         weights /= max_weight
         weights = torch.tensor(weights, device=self.device, dtype=torch.float)
 
-        return samples, indices, weights
+        batch = Transition(*zip(*samples))
+
+        state = torch.FloatTensor(np.concatenate(batch.state)).to(self.device)
+        action = torch.FloatTensor(np.concatenate(batch.action)).to(self.device)
+        next_state = torch.FloatTensor(np.concatenate(batch.next_state)).to(self.device)
+        reward = torch.FloatTensor(np.concatenate(batch.reward)).to(self.device)
+        done = torch.FloatTensor(np.concatenate(batch.done)).to(self.device)
+
+        return state, action, next_state, reward, done
 
     def update_priorities(self, batch_indices, batch_priorities):
         for idx, prio in zip(batch_indices, batch_priorities):

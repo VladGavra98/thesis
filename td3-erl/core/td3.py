@@ -9,10 +9,9 @@ from core.mod_utils import hard_update, soft_update, LayerNorm
 
 from typing import Tuple, Dict, List
 
-MAX_GRAD_NORM = 5
+MAX_GRAD_NORM = 1
 
 class Critic(nn.Module):
-
     def __init__(self, args):
         super(Critic, self).__init__()
         self.args = args
@@ -108,9 +107,8 @@ class TD3(object):
 
 
     def update_parameters(self, batch, iteration : int, champion_policy = None) -> Tuple[float,float]:
-        pgl = None
         state_batch, action_batch, next_state_batch, reward_batch, done_batch = batch
-
+        pgl = None
         with torch.no_grad():
             # Load everything to GPU if not already
             self.actor_target.to(self.args.device)
@@ -151,7 +149,7 @@ class TD3(object):
 
             # retrieve value of the critics
             est_q1,_ = self.critic.forward(state_batch, self.actor.forward(state_batch))
-            policy_grad_loss = -torch.mean(est_q1)                        # add minus to make it a loss
+            policy_grad_loss = -torch.mean(est_q1)             # add minus to make it a loss
 
             # backprop
             policy_grad_loss.backward()
@@ -166,7 +164,6 @@ class TD3(object):
             soft_update(self.critic_target, self.critic, self.tau)
 
             pgl = policy_grad_loss.data.cpu().numpy()
-
         return pgl, TD.data.cpu().numpy()
 
 

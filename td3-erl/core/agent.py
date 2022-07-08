@@ -169,7 +169,6 @@ class Agent:
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
                 batch = self.replay_buffer.sample(self.args.batch_size)
-
                 pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion.actor)
 
                 if pgl is not None:
@@ -213,7 +212,7 @@ class Agent:
             '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
             # Evaluate genomes/individuals
             # >>> loop over population AND store experiences
-            for net in self.pop:   
+            for net in tqdm(self.pop):   
                 for _ in range(self.args.num_evals):
                     episode = self.evaluate(net, is_action_noise = False,\
                                         store_transition=True)

@@ -66,7 +66,7 @@ class Parameters:
 
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
-            self.policy_update_freq = 2      # minimum for TD3
+            self.policy_update_freq = 4      # minimum for TD3
             self.lr  = 2e-3                  # overwrite lr for actor & critic 
         self.noise_clip = 0.5                # default for TD3
 
@@ -92,11 +92,10 @@ class Parameters:
             self.mutation_mag = 0.1
             self.mutation_batch_size = 256
             self.proximal_mut = cla.proximal_mut
-            self.distil = cla.distil
+            self.distil_crossover = cla.use_distil
             self.distil_type = cla.distil_type
             self._verbose_mut = cla.verbose_mut
             self._verbose_crossover = cla.verbose_crossover
-
 
             # Variation operator statistics
             self.opstat = cla.opstat
@@ -125,28 +124,4 @@ class Parameters:
 
         return self.__dict__
 
-    def save_agent (self,  parameters: object, elite_index: int = None):
-        """ Save the trained agents.
-
-        Args:
-            parameters (_type_): Container class of the trainign hyperparameters.
-            elite_index (int: Index of the best performing agent i.e. the champion. Defaults to None.
-        """
-        actors_dict = {}
-        for i, ind in enumerate(self.pop):
-            actors_dict[f'actor_{i}'] = ind.actor.state_dict()
-        torch.save(actors_dict, os.path.join(
-            parameters.save_foldername, 'evo_nets.pkl'))
-
-        # Save best performing agent separately:
-        if elite_index is not None:
-            torch.save(self.pop[elite_index].actor.state_dict(), 
-                        os.path.join(parameters.save_foldername,'elite_net.pkl'))
-        
-        # save state history of the champion
-        filename = 'statehistory_episode' + str(self.num_episodes) + '.txt'
-        np.savetxt(os.path.join(parameters.save_foldername,filename),
-            self.champion_state_history, header = str(self.num_episodes))
-        print('State hitostory saved to ' + str(filename))
-        print("Progress Saved")
   

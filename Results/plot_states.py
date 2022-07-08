@@ -132,7 +132,7 @@ if __name__ == '__main__':
                 flst.append(file)
                 ep_num_lst.append(ep_num)
 
-    print(flst, rl_flst, ep_num_lst)
+
     idx = -1
     if len(flst):
         plot_epsiode_data_champ(flst, ep_num_lst, idx)

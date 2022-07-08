@@ -30,12 +30,11 @@ parser.add_argument('-render', help='Render gym episodes', action='store_true')
 
 
 parser.add_argument('-novelty', help='Use novelty exploration', action='store_true')
-parser.add_argument('-proximal_mut', help='Use safe mutation',
-                    action='store_true', default=True)
-parser.add_argument('-distil', help='Use distilation crossover',
-                    action='store_true', default=True)
+parser.add_argument('-proximal_mut', help='Use safe mutation', action='store_true', default=True)
+parser.add_argument('-use_distil', help='Use distilation crossover', action='store_true', default=False)
 parser.add_argument('-distil_type', help='Use distilation crossover. Choices: (fitness) (distance)',
                     type=str, default='distance')
+                    
 parser.add_argument('-per', help='Use Prioritised Experience Replay', action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover',help='Make crossovers verbose', action='store_true')
