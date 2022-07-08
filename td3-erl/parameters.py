@@ -54,7 +54,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 64
+        self.hidden_size = 64  # 64 for TD# only 
 
         # Prioritised Experience Replay
         self.per = cla.per
@@ -77,6 +77,9 @@ class Parameters:
         # Genetic memory size
         self.individual_bs = 10_000
         if self.pop_size:
+            # overwrite policy size
+            self.hidden_size = 128  # 96
+
             # increase buffer size for more experiences
             self.buffer_size*= self.pop_size//2
 

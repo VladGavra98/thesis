@@ -17,8 +17,8 @@ class Critic(nn.Module):
         self.args = args
 
         # layer sizes
-        # l1 = 200; l2 = 300; l3 = l2   
-        l1 =32; l2 = 64;
+        # l1 = 200; l2 = 300; l3 = l2    # original PDERL values (no tuning done)
+        l1 = 64; l2 = 64;            # NOTE these worked for TD3-only control 
 
         # Critic 1
         self.bnorm_1 = nn.BatchNorm1d(args.state_dim + args.action_dim)  # batch norm

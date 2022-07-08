@@ -204,29 +204,30 @@ class Agent:
     def train(self):
         self.gen_frames = 0
         self.iterations += 1
-        rewards, bcs_lst, lengths = [], [], [] 
+        
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
         test_score = 1; test_sd = 1; 
+        bcs_lst, lengths = [], []
+        rewards = np.zeros((self.args.num_evals, self.args.pop_size))
 
         if len(self.pop):
             '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
             # Evaluate genomes/individuals
             # >>> loop over population AND store experiences
-            for net in tqdm(self.pop):   
-                for _ in range(self.args.num_evals):
+            for j,net in enumerate(self.pop):   
+                for i in range(self.args.num_evals):
                     episode = self.evaluate(net, is_action_noise = False,\
-                                        store_transition=True)
-                    rewards.append(episode.reward)
+                                                store_transition = True)
+                    rewards[i,j] = episode.reward
                     bcs_lst.append(episode.bcs)
                     lengths.append(episode.length)
 
             # take average stats
-            rewards = np.asarray(rewards).reshape((-1,len(self.pop)))
-            bcs_lst = np.asarray(bcs_lst).reshape((-1,len(self.pop)))
+            # rewards = np.asarray(rewards).reshape((-1,self.args.pop_size))
+            bcs_lst = np.asarray(bcs_lst).reshape((-1,self.args.pop_size))
             rewards = np.mean(rewards, axis = 0) 
             bcs     = np.mean(bcs_lst, axis = 0)
             ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
-
 
             # get popualtion stats
             best_train_fitness  = np.max(rewards)              # champion - highest reward
@@ -243,7 +244,7 @@ class Agent:
 
         ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3) ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
-        if len(self.pop) == 0:
+        if self.args.pop_size == 0:
             print('Info: playing extra episodes with action nosie for RL training')
             for _ in range(10):
                 episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
