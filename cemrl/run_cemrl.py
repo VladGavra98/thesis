@@ -6,7 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pandas as pd
 
-import gym
+import wandb
+import envs.config
 import gym.spaces
 import numpy as np
 from tqdm import tqdm
@@ -38,7 +39,7 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
             if noise is not None:
                 action += noise.sample()
 
-            return np.clip(action, -max_action, max_action)
+            return np.clip(action, -1.0, 1.0)
 
     else:
         def policy(state):
@@ -58,18 +59,16 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
             # get next action and act
             action = policy(obs)
             n_obs, reward, done, _ = env.step(action)
-            done_bool = 0 if steps + \
-                1 == env._max_episode_steps else float(done)
             score += reward
             steps += 1
 
             # adding in memory
             if memory is not None:
                 if done:
-                    memory.add((obs, n_obs, action, score, done_bool))
+                    memory.add((obs, n_obs, action, score, done))
 
                 else:
-                    memory.add((obs, n_obs, action, 0, done_bool))
+                    memory.add((obs, n_obs, action, 0, done))
             obs = n_obs
 
             # render if needed
@@ -89,14 +88,15 @@ class Actor(RLNN):
 
     def __init__(self, state_dim, action_dim, max_action, args):
         super(Actor, self).__init__(state_dim, action_dim, max_action)
-
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        hidden_size = 128
+        
+        self.l1 = nn.Linear(state_dim, hidden_size)
+        self.l2 = nn.Linear(hidden_size, hidden_size)
+        self.l3 = nn.Linear(hidden_size, action_dim)
 
         if args.layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden_size)
+            self.n2 = nn.LayerNorm(hidden_size)
         self.layer_norm = args.layer_norm
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_lr)
@@ -268,7 +268,7 @@ class CriticTD3(RLNN):
         noise = np.clip(np.random.normal(0, self.policy_noise, size=(
             batch_size, action_dim)), -self.noise_clip, self.noise_clip)
         n_actions = actor_t(n_states) + FloatTensor(noise)
-        n_actions = n_actions.clamp(-max_action, max_action)
+        n_actions = n_actions.clamp(-1, 1)
 
         # Q target = reward + discount * min_i(Qi(next_state, pi(next_state)))
         with torch.no_grad():
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', default='train', type=str,)
-    parser.add_argument('--env', default='HalfCheetah-v2', type=str)
+    parser.add_argument('--env', default='PHlab_attitude', type=str)
     parser.add_argument('--start_steps', default=10000, type=int)
 
     # DDPG parameters
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     parser.add_argument('--layer_norm', dest='layer_norm', action='store_true')
 
     # TD3 parameters
-    parser.add_argument('--use_td3', dest='use_td3', action='store_true')
+    parser.add_argument('--use_td3', dest='use_td3', default= True, action='store_true')
     parser.add_argument('--policy_noise', default=0.2, type=float)
     parser.add_argument('--noise_clip', default=0.5, type=float)
     parser.add_argument('--policy_freq', default=2, type=int)
@@ -362,28 +362,28 @@ if __name__ == "__main__":
             file.write("{} = {}\n".format(key, value))
 
     # environment
-    env = gym.make(args.env)
-    state_dim = env.observation_space.shape[0]
+    # Create Env
+    env = envs.config.select_env(args.env)
     action_dim = env.action_space.shape[0]
-    max_action = int(env.action_space.high[0])
+    state_dim = env.observation_space.shape[0]
 
     # memory
     memory = Memory(args.mem_size, state_dim, action_dim)
 
     # critic
     if args.use_td3:
-        critic = CriticTD3(state_dim, action_dim, max_action, args)
-        critic_t = CriticTD3(state_dim, action_dim, max_action, args)
+        critic = CriticTD3(state_dim, action_dim, 1, args)
+        critic_t = CriticTD3(state_dim, action_dim, 1, args)
         critic_t.load_state_dict(critic.state_dict())
 
     else:
-        critic = Critic(state_dim, action_dim, max_action, args)
-        critic_t = Critic(state_dim, action_dim, max_action, args)
+        critic = Critic(state_dim, action_dim, 1, args)
+        critic_t = Critic(state_dim, action_dim, 1, args)
         critic_t.load_state_dict(critic.state_dict())
 
     # actor
-    actor = Actor(state_dim, action_dim, max_action, args)
-    actor_t = Actor(state_dim, action_dim, max_action, args)
+    actor = Actor(state_dim, action_dim, 1, args)
+    actor_t = Actor(state_dim, action_dim, 1, args)
     actor_t.load_state_dict(actor.state_dict())
 
     # action noise
@@ -499,6 +499,6 @@ if __name__ == "__main__":
                 actor.save_model(args.output, "actor")
             df = df.append(res, ignore_index=True)
             step_cpt = 0
-            print(res)
+
 
         print("Total steps", total_steps)
