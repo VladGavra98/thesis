@@ -1,5 +1,6 @@
 from copy import deepcopy
 import argparse
+import random
 
 import torch
 import torch.nn as nn
@@ -8,7 +9,6 @@ import pandas as pd
 
 import wandb
 import envs.config
-import gym.spaces
 import numpy as np
 from tqdm import tqdm
 
@@ -45,7 +45,7 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
         def policy(state):
             return env.action_space.sample()
 
-    scores = []
+    scores, lengths = [], []
     steps = 0
 
     for _ in range(n_episodes):
@@ -58,7 +58,7 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
 
             # get next action and act
             action = policy(obs)
-            n_obs, reward, done, _ = env.step(action)
+            n_obs, reward, done, info = env.step(action)
             score += reward
             steps += 1
 
@@ -78,17 +78,18 @@ def evaluate(actor, env, memory=None, n_episodes=1, random=False, noise=None, re
             # reset when done
             if done:
                 env.reset()
+            lengths.append(info['t'])
 
         scores.append(score)
 
-    return np.mean(scores), steps
+    return np.mean(scores), steps, np.mean(lengths)
 
 
 class Actor(RLNN):
 
-    def __init__(self, state_dim, action_dim, max_action, args):
-        super(Actor, self).__init__(state_dim, action_dim, max_action)
-        hidden_size = 128
+    def __init__(self, state_dim, action_dim, args):
+        super(Actor, self).__init__(state_dim, action_dim)
+        hidden_size = args.hidden_size
         
         self.l1 = nn.Linear(state_dim, hidden_size)
         self.l2 = nn.Linear(hidden_size, hidden_size)
@@ -99,24 +100,23 @@ class Actor(RLNN):
             self.n2 = nn.LayerNorm(hidden_size)
         self.layer_norm = args.layer_norm
 
+        self.gamma = args.gamma
         self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_lr)
         self.tau = args.tau
-        self.discount = args.discount
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.max_action = max_action
 
     def forward(self, x):
 
         if not self.layer_norm:
             x = torch.tanh(self.l1(x))
             x = torch.tanh(self.l2(x))
-            x = self.max_action * torch.tanh(self.l3(x))
+            x = torch.tanh(self.l3(x))
 
         else:
             x = torch.tanh(self.n1(self.l1(x)))
             x = torch.tanh(self.n2(self.l2(x)))
-            x = self.max_action * torch.tanh(self.l3(x))
+            x = torch.tanh(self.l3(x))
 
         return x
 
@@ -140,6 +140,8 @@ class Actor(RLNN):
         for param, target_param in zip(self.parameters(), actor_t.parameters()):
             target_param.data.copy_(
                 self.tau * param.data + (1 - self.tau) * target_param.data)
+        
+        return -actor_loss
 
 
 class Critic(RLNN):
@@ -157,7 +159,7 @@ class Critic(RLNN):
         self.layer_norm = args.layer_norm
         self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_lr)
         self.tau = args.tau
-        self.discount = args.discount
+        self.gamma = args.gamma
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.max_action = max_action
@@ -184,7 +186,7 @@ class Critic(RLNN):
         # Q target = reward + discount * Q(next_state, pi(next_state))
         with torch.no_grad():
             target_Q = critic_t(n_states, actor_t(n_states))
-            target_Q = rewards + (1 - dones) * self.discount * target_Q
+            target_Q = rewards + (1 - dones) * self.gamma * target_Q
 
         # Get current Q estimate
         current_Q = self(states, actions)
@@ -228,7 +230,7 @@ class CriticTD3(RLNN):
         self.layer_norm = args.layer_norm
         self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_lr)
         self.tau = args.tau
-        self.discount = args.discount
+        self.gamma = args.gamma
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.max_action = max_action
@@ -274,7 +276,7 @@ class CriticTD3(RLNN):
         with torch.no_grad():
             target_Q1, target_Q2 = critic_t(n_states, n_actions)
             target_Q = torch.min(target_Q1, target_Q2)
-            target_Q = rewards + (1 - dones) * self.discount * target_Q
+            target_Q = rewards + (1 - dones) * self.gamma * target_Q
 
         # Get current Q estimates
         current_Q1, current_Q2 = self(states, actions)
@@ -292,24 +294,30 @@ class CriticTD3(RLNN):
         for param, target_param in zip(self.parameters(), critic_t.parameters()):
             target_param.data.copy_(
                 self.tau * param.data + (1 - self.tau) * target_param.data)
+        return critic_loss
 
 
 if __name__ == "__main__":
+    num_episodes = 250
+    num_frames = num_episodes * 2000
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', default='train', type=str,)
+    parser.add_argument('-should_log', help='Wether the WandB loggers are used', action='store_true')
+    parser.add_argument('-run_name', default='test', type=str)
     parser.add_argument('--env', default='PHlab_attitude', type=str)
     parser.add_argument('--start_steps', default=10000, type=int)
 
     # DDPG parameters
-    parser.add_argument('--actor_lr', default=0.001, type=float)
-    parser.add_argument('--critic_lr', default=0.001, type=float)
-    parser.add_argument('--batch_size', default=100, type=int)
-    parser.add_argument('--discount', default=0.99, type=float)
+    parser.add_argument('--actor_lr', default=0.002, type=float)
+    parser.add_argument('--critic_lr', default=0.002, type=float)
+    parser.add_argument('--batch_size', default=256, type=int)
+    parser.add_argument('--gamma', default=0.98, type=float)
     parser.add_argument('--reward_scale', default=1., type=float)
     parser.add_argument('--tau', default=0.005, type=float)
     parser.add_argument('--layer_norm', dest='layer_norm', action='store_true')
+    parser.add_argument('--hidden_size', default = 96)
 
     # TD3 parameters
     parser.add_argument('--use_td3', dest='use_td3', default= True, action='store_true')
@@ -337,7 +345,7 @@ if __name__ == "__main__":
 
     # Training parameters
     parser.add_argument('--n_episodes', default=1, type=int)
-    parser.add_argument('--max_steps', default=1000000, type=int)
+    parser.add_argument('--max_steps', default=num_frames, type=int)
     parser.add_argument('--mem_size', default=1000000, type=int)
     parser.add_argument('--n_noisy', default=0, type=int)
 
@@ -346,26 +354,27 @@ if __name__ == "__main__":
     parser.add_argument('--n_test', default=1, type=int)
 
     # misc
-    parser.add_argument('--output', default='results/', type=str)
+    parser.add_argument('--save_foldername', default='logs/tmp', type=str)
     parser.add_argument('--period', default=5000, type=int)
-    parser.add_argument('--n_eval', default=10, type=int)
+    parser.add_argument('--n_eval', default=5, type=int)
     parser.add_argument('--save_all_models',
                         dest="save_all_models", action="store_true")
     parser.add_argument('--debug', dest='debug', action='store_true')
-    parser.add_argument('--seed', default=-1, type=int)
+    parser.add_argument('--seed', default=7, type=int)
     parser.add_argument('--render', dest='render', action='store_true')
 
     args = parser.parse_args()
-    args.output = get_output_folder(args.output, args.env)
-    with open(args.output + "/parameters.txt", 'w') as file:
-        for key, value in vars(args).items():
-            file.write("{} = {}\n".format(key, value))
 
     # environment
-    # Create Env
     env = envs.config.select_env(args.env)
     action_dim = env.action_space.shape[0]
     state_dim = env.observation_space.shape[0]
+
+    # Seed
+    env.seed(args.seed)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     # memory
     memory = Memory(args.mem_size, state_dim, action_dim)
@@ -409,17 +418,32 @@ if __name__ == "__main__":
     actor_steps = 0
     df = pd.DataFrame(columns=["total_steps", "average_score",
                                "average_score_rl", "average_score_ea", "best_score"])
-    while total_steps < args.max_steps:
 
+    # strat trackers
+    if args.should_log:
+        print('\033[1;32m WandB logging started')
+        run = wandb.init(project="cem_phlab_longitudinal",
+                        entity="vgavra",
+                        dir='../logs',
+                        name=args.run_name,
+                        config=args.__dict__)
+        args.save_foldername = str(run.dir)
+        wandb.config.update({"save_foldername": args.save_foldername,
+                            "run_name": run.name}, allow_val_change=True)
+
+    # args.save_foldername = get_output_folder(args.save_foldername, args.env)
+    # with open(args.save_foldername + "/parameters.txt", 'w') as file:
+    #     for key, value in vars(args).items():
+    #         file.write("{} = {}\n".format(key, value))
+
+    while total_steps < args.max_steps:
         fitness = []
-        fitness_ = []
         es_params = es.ask(args.pop_size)
+        TD_loss, PG_obj  = 0., 0.
 
         # udpate the rl actors and the critic
         if total_steps > args.start_steps:
-
             for i in range(args.n_grad):
-
                 # set params
                 actor.set_params(es_params[i])
                 actor_t.set_params(es_params[i])
@@ -428,33 +452,35 @@ if __name__ == "__main__":
 
                 # critic update
                 for _ in tqdm(range(actor_steps // args.n_grad)):
-                    critic.update(memory, args.batch_size, actor, critic_t)
+                    TD_loss = critic.update(memory, args.batch_size, actor, critic_t)
 
                 # actor update
                 for _ in tqdm(range(actor_steps)):
-                    actor.update(memory, args.batch_size,
-                                 critic, actor_t)
+                    PG_obj = actor.update(memory, args.batch_size,critic, actor_t)
 
                 # get the params back in the population
                 es_params[i] = actor.get_params()
         actor_steps = 0
 
-        # evaluate noisy actor(s)
+        # Evaluate noisy actor(s)
+        
         for i in range(args.n_noisy):
             actor.set_params(es_params[i])
-            f, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
+            f, steps, _ = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
                                 render=args.render, noise=a_noise)
             actor_steps += steps
+
             prCyan('Noisy actor {} fitness:{}'.format(i, f))
 
-        # evaluate all actors
+        # Evaluate all actors
+        ep_lengths = []
         for params in es_params:
-
             actor.set_params(params)
-            f, steps = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
+            f, steps, lengths = evaluate(actor, env, memory=memory, n_episodes=args.n_episodes,
                                 render=args.render)
             actor_steps += steps
             fitness.append(f)
+            ep_lengths.append(lengths)
 
             # print scores
             prLightPurple('Actor fitness:{}'.format(f))
@@ -469,35 +495,42 @@ if __name__ == "__main__":
         # save stuff
         if step_cpt >= args.period:
 
-            # evaluate mean actor over several runs. Memory is not filled
-            # and steps are not counted
+            # Evaluate mean actor over several runs - DO not store trials
             actor.set_params(es.mu)
-            f_mu, _ = evaluate(actor, env, memory=None, n_episodes=args.n_eval,
+            f_mu, _, _ = evaluate(actor, env, memory=None, n_episodes=args.n_eval,
                                render=args.render)
             prRed('Actor Mu Average Fitness:{}'.format(f_mu))
 
-            df.to_pickle(args.output + "/log.pkl")
-            res = {"total_steps": total_steps,
+            # df.to_pickle(args.save_foldername + "/log.pkl")
+            res = {"frames": total_steps,
                    "average_score": np.mean(fitness),
                    "average_score_half": np.mean(np.partition(fitness, args.pop_size // 2 - 1)[args.pop_size // 2:]),
                    "average_score_rl": np.mean(fitness[:args.n_grad]),
                    "average_score_ea": np.mean(fitness[args.n_grad:]),
                    "best_score": np.max(fitness),
+                   "PG_objective": PG_obj, 
+                   "TD_loss": TD_loss,
+                   "avg_ep_length": np.average(ep_lengths),
                    "mu_score": f_mu}
 
-            if args.save_all_models:
-                os.makedirs(args.output + "/{}_steps".format(total_steps),
-                            exist_ok=True)
-                critic.save_model(
-                    args.output + "/{}_steps".format(total_steps), "critic")
-                actor.set_params(es.mu)
-                actor.save_model(
-                    args.output + "/{}_steps".format(total_steps), "actor_mu")
-            else:
-                critic.save_model(args.output, "critic")
-                actor.set_params(es.mu)
-                actor.save_model(args.output, "actor")
-            df = df.append(res, ignore_index=True)
+            if args.should_log:
+                wandb.log(res) 
+
+
+            # TODO:implement a savign function 
+            # if args.save_all_models:
+            #     # os.makedirs(args.save_foldername + "/{}_steps".format(total_steps),
+            #     #             exist_ok=True)
+            #     critic.save_model(
+            #         args.save_foldername + "/{}_steps".format(total_steps), "critic")
+            #     actor.set_params(es.mu)
+            #     actor.save_model(
+            #         args.save_foldername + "/{}_steps".format(total_steps), "actor_mu")
+            # else:
+            #     critic.save_model(args.save_foldername, "critic")
+            #     actor.set_params(es.mu)
+            #     actor.save_model(args.save_foldername, "actor")
+
             step_cpt = 0
 
 

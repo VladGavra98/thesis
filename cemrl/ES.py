@@ -27,7 +27,7 @@ def compute_centered_ranks(x):
 
 
 def compute_weight_decay(weight_decay, model_param_list):
-    model_param_grid = np.array(model_param_list)
+    model_param_grid = np.asarray(model_param_list)
     return -weight_decay * np.mean(model_param_grid * model_param_grid, axis=1)
 
 
@@ -54,7 +54,7 @@ class VES:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
 
         # optimization stuff
@@ -89,7 +89,7 @@ class VES:
         assert(len(scores) ==
                self.pop_size), "Inconsistent reward_table size reported."
 
-        reward = np.array(scores)
+        reward = np.asarray(scores)
         if self.rank_fitness:
             reward = compute_centered_ranks(reward)
 
@@ -138,7 +138,7 @@ class GES:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
         self.U = np.ones((self.num_params, k))
 
@@ -183,7 +183,7 @@ class GES:
         assert(len(scores) ==
                self.pop_size), "Inconsistent reward_table size reported."
 
-        reward = np.array(scores)
+        reward = np.asarray(scores)
         if self.rank_fitness:
             reward = compute_centered_ranks(reward)
 
@@ -236,7 +236,7 @@ class sepCMAES:
         # distribution parameters
         self.num_params = num_params
         if mu_init is not None:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         else:
             self.mu = np.zeros(num_params)
         self.antithetic = antithetic
@@ -250,7 +250,7 @@ class sepCMAES:
         # selection parameters
         self.pop_size = pop_size
         self.parents = pop_size // 2
-        self.weights = np.array([np.log((self.parents + 1) / i)
+        self.weights = np.asarray([np.log((self.parents + 1) / i)
                                  for i in range(1, self.parents + 1)])
         self.weights /= self.weights.sum()
         self.parents_eff = 1 / (self.weights ** 2).sum()
@@ -290,7 +290,7 @@ class sepCMAES:
         Updates the distribution
         """
 
-        scores = np.array(scores)
+        scores = np.asarray(scores)
         scores *= -1
         idx_sorted = np.argsort(scores)
 
@@ -357,7 +357,7 @@ class sepCEMv2:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
         self.damp = damp
         self.damp_limit = damp_limit
@@ -379,7 +379,7 @@ class sepCEMv2:
             self.parents = pop_size // 2
         else:
             self.parents = parents
-        self.weights = np.array([np.log((self.parents + 1) / i)
+        self.weights = np.asarray([np.log((self.parents + 1) / i)
                                  for i in range(1, self.parents + 1)])
         self.weights /= self.weights.sum()
 
@@ -404,7 +404,7 @@ class sepCEMv2:
         """
         Updates the distribution
         """
-        scores = np.array(scores)
+        scores = np.asarray(scores)
         scores *= -1
         idx_sorted = np.argsort(scores)
 
@@ -458,7 +458,7 @@ class sepCEM:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
         self.damp = damp
         self.damp_limit = damp_limit
@@ -480,7 +480,7 @@ class sepCEM:
             self.parents = pop_size // 2
         else:
             self.parents = parents
-        self.weights = np.array([np.log((self.parents + 1) / i)
+        self.weights = np.asarray([np.log((self.parents + 1) / i)
                                  for i in range(1, self.parents + 1)])
         self.weights /= self.weights.sum()
 
@@ -505,7 +505,7 @@ class sepCEM:
         """
         Updates the distribution
         """
-        scores = np.array(scores)
+        scores = np.asarray(scores)
         scores *= -1
         idx_sorted = np.argsort(scores)
 
@@ -519,7 +519,7 @@ class sepCEM:
 
         self.elite = solutions[idx_sorted[0]]
         self.elite_score = scores[idx_sorted[0]]
-        print(self.cov)
+        # print(self.cov)
 
     def get_distrib_params(self):
         """
@@ -578,7 +578,7 @@ class sepCEMA:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
         self.cov = self.sigma * np.ones(self.num_params)
 
@@ -597,7 +597,7 @@ class sepCEMA:
             self.parents = pop_size // 2
         else:
             self.parents = parents
-        self.weights = np.array([np.log((self.parents + 1) / i)
+        self.weights = np.asarray([np.log((self.parents + 1) / i)
                                  for i in range(1, self.parents + 1)])
         self.weights /= self.weights.sum()
 
@@ -622,7 +622,7 @@ class sepCEMA:
         """
         Updates the distribution
         """
-        scores = np.array(scores)
+        scores = np.asarray(scores)
         scores *= -1
         idx_sorted = np.argsort(scores)
 
@@ -673,7 +673,7 @@ class sepMCEM:
         if mu_init is None:
             self.mu = np.zeros(self.num_params)
         else:
-            self.mu = np.array(mu_init)
+            self.mu = np.asarray(mu_init)
         self.sigma = sigma_init
         self.damp = sigma_init
         self.damp_limit = damp
@@ -689,7 +689,7 @@ class sepMCEM:
             self.parents = pop_size // 2
         else:
             self.parents = parents
-        self.weights = np.array([np.log((self.parents + 1) / i)
+        self.weights = np.asarray([np.log((self.parents + 1) / i)
                                  for i in range(1, self.parents + 1)])
         self.weights /= self.weights.sum()
 
@@ -709,7 +709,7 @@ class sepMCEM:
         """
         Updates the distribution
         """
-        scores = np.array(scores)
+        scores = np.asarray(scores)
         scores *= -1
         idx_sorted = np.argsort(scores)
 

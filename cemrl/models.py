@@ -16,11 +16,11 @@ else:
 
 class RLNN(nn.Module):
 
-    def __init__(self, state_dim, action_dim, max_action):
+    def __init__(self, state_dim, action_dim):
         super(RLNN, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.max_action = max_action
+
 
     def set_params(self, params):
         """
@@ -79,33 +79,7 @@ class RLNN(nn.Module):
         )
 
 
-class Actor(RLNN):
 
-    def __init__(self, state_dim, action_dim, max_action, layer_norm=False, init=True):
-        super(Actor, self).__init__(state_dim, action_dim, max_action)
-
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
-
-        if layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
-        self.layer_norm = layer_norm
-
-    def forward(self, x):
-
-        if not self.layer_norm:
-            x = torch.tanh(self.l1(x))
-            x = torch.tanh(self.l2(x))
-            x = self.max_action * torch.tanh(self.l3(x))
-
-        else:
-            x = torch.tanh(self.n1(self.l1(x)))
-            x = torch.tanh(self.n2(self.l2(x)))
-            x = self.max_action * torch.tanh(self.l3(x))
-
-        return x
 
 
 class Critic(RLNN):
