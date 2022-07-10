@@ -1,7 +1,7 @@
 import pprint
 import os
 import torch
-import numpy as np
+
 
 class Parameters:
     def __init__(self, cla, init=True):
@@ -39,7 +39,7 @@ class Parameters:
         # Model save frequency if save is active
         self.next_save = cla.next_save
 
-        # ==================================  DDPG legacy Params =============================================
+        # ==================================  RL (DDPG) Params =============================================
         self.use_ddpg = cla.use_ddpg   # default should be False
         self.frac_frames_train = 1
 
@@ -55,18 +55,21 @@ class Parameters:
 
         # hidden layer
         self.hidden_size = 64  # 64 for TD# only 
+        self.activation  = 'elu'
+
+        self.learn_start = 20_000   # frames accumulated before grad updates            
+        # self.total_steps = self.num_frames
 
         # Prioritised Experience Replay
         self.per = cla.per
-        self.replace_old = True
-        self.alpha = 0.7
-        self.beta_zero = 0.5
-        self.learn_start = 2000              # [frames] 
-        # self.total_steps = self.num_frames
+        if self.per:
+            self.replace_old = True
+            self.alpha = 0.7
+            self.beta_zero = 0.5
 
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
-            self.policy_update_freq = 4      # minimum for TD3
+            self.policy_update_freq = 3      # minimum for TD3
             self.lr  = 2e-3                  # overwrite lr for actor & critic 
         self.noise_clip = 0.5                # default for TD3
 
@@ -78,7 +81,7 @@ class Parameters:
         self.individual_bs = 10_000
         if self.pop_size:
             # overwrite policy size
-            self.hidden_size = 128  # 96
+            self.hidden_size = 96
 
             # increase buffer size for more experiences
             self.buffer_size*= self.pop_size//2

@@ -73,7 +73,8 @@ class Agent:
         # Trackers
         self.num_episodes = 0; self.num_frames = 0; self.iterations = 0; self.gen_frames = None
         self.rl_iteration = 0            # for TD3 delyed policy updates
-        self.champion : genetic_agent = None
+        self.champion : genetic_agent.GeneticAgent = None
+        self.champion_actor: genetic_agent.Actor   = None
         self.champion_history : np.ndarray = None
 
 
@@ -163,36 +164,38 @@ class Agent:
             The frames are sampled from the common buffer.
         """
         print('Train RL agent ...')
-        pgs_obj, TD_loss = [], []
-        if len(self.replay_buffer) > self.args.batch_size * 20:  
+        pgs_obj, TD_loss = [],[]
+
+        if len(self.replay_buffer) > self.args.learn_start: 
+            
+            if self.champion_actor is not None: self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
             # agent has seen some experiences already
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
+
                 batch = self.replay_buffer.sample(self.args.batch_size)
-                pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion.actor)
+                pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion_actor)
 
-                if pgl is not None:
-                    pgs_obj.append(-pgl)
+                if pgl is not None: pgs_obj.append(-pgl)
+                if TD is not None: TD_loss.append(TD)
+                
+        return {'PG_obj': np.mean(pgs_obj), 'TD_loss': np.median(TD_loss)}
 
-                TD_loss.append(TD)
-
-        return {'PG_obj': np.mean(pgs_obj), 'TD_loss': np.mean(TD_loss)}
-
-    def validate_actor (self, actor : genetic_agent.Actor) -> Tuple[float, float, Episode]:
+    def validate_agent (self, agent : genetic_agent.Actor) -> Tuple[float, float, Episode]:
         """ Evaluate the  given actor and do NOT store these trials. 
         """
         test_scores = []
-        
+
         for _ in range(self.validation_tests):
-            episode = self.evaluate(actor, is_action_noise = False,\
+            last_episode = self.evaluate(agent, is_action_noise = False,\
                                         store_transition = False) 
-            test_scores.append(episode.reward)
+            test_scores.append(last_episode.reward)
 
         # futures = dask.persist(*test_scores); test_scores = dask.compute(*futures)
         test_score = np.mean(test_scores)
         test_sd = np.std(test_scores)
 
-        return test_score,test_sd, episode
+        return test_score,test_sd, last_episode
 
     def get_history (self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
@@ -234,9 +237,10 @@ class Agent:
             worst_train_fitness = np.min(rewards)
             population_avg      = np.average(rewards)          # population_avg 
             self.champion       = self.pop[np.argmax(rewards)]
+            self.champion_actor  = self.champion.actor         # unpack for RL critic updates 
 
             # Validation test for NeuroEvolution 
-            test_score, test_sd, last_episode = self.validate_actor(self.champion)
+            test_score, test_sd, last_episode = self.validate_agent(self.champion)
             self.champion_history = self.get_history(last_episode)
 
             # NeuroEvolution's probabilistic selection and recombination step
@@ -258,7 +262,7 @@ class Agent:
         rl_train_scores = self.train_rl()
 
         # Validate rl separately
-        rl_reward,rl_std, rl_episode = self.validate_actor(self.rl_agent)
+        rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
 
         self.rl_history = self.get_history(rl_episode)
 
