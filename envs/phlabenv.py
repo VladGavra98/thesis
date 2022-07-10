@@ -392,6 +392,8 @@ def evaluate(verbose : bool = False):
         # save 
         rewards.append(reward)
 
+
+
         
     return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
 
