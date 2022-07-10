@@ -10,6 +10,13 @@ from gym.spaces import Box
 import numpy as np
 from typing import Tuple, List, Dict
 
+import numba
+from numba import jit
+from numba import int8, int16  ,int32,  float64
+from numba.experimental import jitclass
+
+from numba.typed import List as NumbaList
+
 
 class BaseEnv(gym.Env, ABC):
     """ Base class to be able to write generic training & eval code
@@ -67,15 +74,83 @@ class BaseEnv(gym.Env, ABC):
         """        
         low, high = self.action_space.low, self.action_space.high
         return low + 0.5 * (clipped_action + 1.0) * (high - low)
+# spec = {
+#     ('n_actions_full', int8),                # n_actions full
+#     ('n_obs_full', int8),                # n_obs full
 
+#     ('t', float64),               # t
+#     ('dt', float64),               # dt
+#     ('t_max', float64),                 # t_max
 
-class CitationEnv(BaseEnv):
+#     ('x', float64[:]),          # x
+#     ('obs', float64[:]),          # obs
+#     ('obs_idx', int8[:]),          # obs_idx
+
+#     ('n_actions', int8),          # n actions
+#     ('last_u', float64[:]),    #last u
+
+#     ('ref', float64[:]), # refference to track
+#     ('rate_bound', float64),       # actuator bounds
+
+#     ('max_theta', float64),     # state bounds
+#     ('max_phi', float64),
+     
+#     ('n_obs', int8), 
+
+#     ('error', float64[:]), # error
+
+#     ('cost', float64[:]), # cost
+#     ('reward_scale', float64), # scale
+     
+#     ('max_bound', float64[:]), # cost
+# }
+spec = {
+    'n_actions_full': int8,                # n_actions full
+    'n_obs_full':int8,                # n_obs full
+
+    't':float64,               # t
+    'dt':float64,               # dt
+    't_max':float64,                 # t_max
+
+    'x':float64[:],          # x
+    'obs':float64[:],          # obs
+    'obs_idx':numba.types.List(numba.int64),          # obs_idx
+
+    'n_actions':int8,          # n actions
+    'last_u':float64[:],    #last u
+
+    'ref':float64[:], # refference to track
+    'rate_bound':float64,       # actuator bounds
+
+    'max_theta':float64,     # state bounds
+    'max_phi':float64,
+     
+    'n_obs':int8, 
+
+    'error':float64[:], # error
+
+    'cost':float64[:], # cost
+    'reward_scale':float64, # scale
+     
+    'max_bound':float64[:], # cost
+}
+
+@jit
+def empty_int8_list():
+    l = [int8(10)]
+    l.clear()
+    return l
+# spec['obs_idx'] = NumbaList(int8)
+
+@jitclass(spec)
+class CitationEnv():
     """ Example citation wrapper with p-control reward function. """
 
-    n_actions_full : int = 10
-    n_obs_full : int = 12
 
     def __init__(self, configuration : str = None):
+        self.n_actions_full : int = 10
+        self.n_obs_full : int = 12
+
         self.t = 0
         self.dt = 0.01      # [s]
         self.t_max = 20.0   # [s]
@@ -85,20 +160,33 @@ class CitationEnv(BaseEnv):
         # 3,  4, 5   -> V, alpha, beta
         # 6,  7, 8   -> phi, theta, psi
         # 9, 10, 11  -> he, xe, ye
-        self.x: np.ndarray       = None    # aircraft state vector 
-        self.obs: np.ndarray     = None    # observation vector -- used for configurations & learning
-        self.obs_idx:List[int]   = None   
+
+        if 'symmetric'  in configuration.lower():
+            print('Symmetric control only.')
+            self.n_actions = 1                # theta
+            self.obs_idx   = [1]              # q
+        elif 'attitude' in configuration.lower():
+            print('Attitude control.')
+            self.n_actions = 3                  # de, da, dr
+            self.obs_idx = [0,1,2]        # all but no xe,ye
+        else:
+            print('Full state control.')
+            self.n_actions = 3
+            self.obs_idx = [0,1,2,3,4,5,6,7,8,9]  
+
+        self.x: np.ndarray       = np.zeros((self.n_obs_full))    # aircraft state vector 
+        self.obs: np.ndarray     = np.zeros((self.n_obs_full))    # observation vector -- used for configurations & learning
+ 
 
         # Have an internal storage of last action [10]
         # Inputs:
         #   0 de      , 1 da      , 2 dr
         #   3 trim de , 4 trim da , 5 trim dr
-        #   6 df      , 7 gear    , 8 throttle1 9 throttle2
-        self.n_actions : int    = None
-        self.last_u: np.ndarray = None
+        #   6 df      , 7 gear    , 8 throttle1 9 throttle2         
+        self.last_u: np.ndarray = np.zeros((self.n_actions))
 
         # refference to track
-        self.ref: List[signals.BaseSignal] = None
+        self.ref: List[signals.BaseSignal] = [np.array([0., 0.,0.])]
         
         # actuator bounds
         self.rate_bound = np.deg2rad(25)        #  [deg/s] 
@@ -106,21 +194,6 @@ class CitationEnv(BaseEnv):
         # state bounds
         self.max_theta = np.deg2rad(60.)
         self.max_phi = np.deg2rad(75.)
-
-        if 'symmetric'  in configuration.lower():
-            print('Symmetric control only.')
-            self.n_actions = 1                  # theta
-            self.obs_idx   = [1]              # q, V, alpha
-
-        elif 'attitude' in configuration.lower():
-            print('Attitude control.')
-            self.n_actions = 3                  # de, da, dr
-            self.obs_idx = [0,1,2]        # all but no xe,ye
-
-        else:
-            print('Full state control.')
-            self.n_actions = 3
-            self.obs_idx = range(10)            # all states         
 
         # observation space: aircraft state + actuator state + control states (equal to actuator states)
         self.n_obs : int = len(self.obs_idx) + 2 * self.n_actions 
@@ -188,6 +261,7 @@ class CitationEnv(BaseEnv):
         """ Load factor [g] """
         return 1 + self.V * self.q/9.80665 
 
+
     def init_ref(self):
         if self.n_actions ==1:
             ref =  RandomizedCosineStepSequence(
@@ -226,19 +300,23 @@ class CitationEnv(BaseEnv):
     def get_reference_value(self) -> float:
         return np.asarray([np.deg2rad(_signal(self.t)) for _signal in self.ref])
 
+
     def get_controlled_state(self) -> float:
         _crtl = np.asarray([self.theta,  self.phi, self.beta])
         return _crtl[:self.n_actions]
 
+
     def calc_error(self) -> np.array:
         self.error[:self.n_actions] = self.get_reference_value() - self.get_controlled_state()
+
 
     def get_reward(self) -> float:
         self.calc_error()
         reward_vec = np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
         reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
         return reward
-    
+
+
     def filter_action(self, action : np.ndarray, tau : float = 1) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
@@ -249,6 +327,7 @@ class CitationEnv(BaseEnv):
     def check_envelope_bounds():
         raise NotImplementedError
 
+
     def pad_action(self, action : np.ndarray) -> np.ndarray:
         """ Pad the non-calculated deflection valeus with 0. 
         """
@@ -258,7 +337,7 @@ class CitationEnv(BaseEnv):
                                 constant_values = (0.)) 
         return citation_input
 
-    def reset (self, **kwargs) -> np.ndarray:
+    def reset (self) -> np.ndarray:
         # Reset time
         self.t = 0.0
 
@@ -279,6 +358,7 @@ class CitationEnv(BaseEnv):
         self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
 
         return self.obs
+
 
     def step (self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         """ Gym-like step function returns: (state, reward, done, info) 
