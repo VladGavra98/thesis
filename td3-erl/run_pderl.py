@@ -44,7 +44,7 @@ parser.add_argument('-test_operators', help='Test the variational operators', ac
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
-                    type=int, default=num_episodes//40)
+                    type=int, default=num_episodes//5)
 
 
 

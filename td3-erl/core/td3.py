@@ -132,9 +132,9 @@ class TD3(object):
             done_batch = done_batch.to(self.args.device)
 
             # Select action according to policy 
-            # noise = (torch.randn_like(action_batch) *\
-            #           self.policy_noise).clamp(-self.args.noise_clip, self.args.noise_clip)
-            next_action_batch = self.actor_target.forward(next_state_batch)
+            noise = (torch.randn_like(action_batch) *\
+                      self.args.noise_sd).clamp(-self.args.noise_clip, self.args.noise_clip)
+            next_action_batch = torch.clamp(noise + self.actor_target.forward(next_state_batch), -1,1)
 
             # Compute the target Q values
             target_Q1, target_Q2 = self.critic_target.forward(next_state_batch, next_action_batch)

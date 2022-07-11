@@ -68,25 +68,29 @@ class Actor(nn.Module):
     def __init__(self, args, init=False):
         super(Actor, self).__init__()
         self.args = args
-        l1 = args.hidden_size; l2 = args.hidden_size; l3 = l2
+        h1,h2,h3  = args.hidden_sizes
 
-        # Construct Hidden Layer 1
+        # Input Layer 
         self.bnorm = nn.BatchNorm1d(args.state_dim)  # batch norm
-        self.w_l1 = nn.Linear(args.state_dim, l1)
+        self.w_l1 = nn.Linear(args.state_dim, h1)
+        self.lnorm1 = LayerNorm(h1)
+
+        # Hidden Layer 1
+        self.w_l2 = nn.Linear(h1, h2)
+        self.lnorm2 = LayerNorm(h2)
 
         # Hidden Layer 2
-        self.lnorm1 = LayerNorm(l1)
-        self.w_l2 = nn.Linear(l1, l2)
+        self.w_l3 = nn.Linear(h2, h3)
+        self.lnorm3 = LayerNorm(h3)
 
         # Out
-        self.lnorm2 = LayerNorm(l2)
-        self.w_out = nn.Linear(l3, args.action_dim)
+        self.w_out = nn.Linear(h3, args.action_dim)
 
-        # Init
-        if init:
-            self.w_out.weight.data.mul_(0.1)
-            self.w_out.bias.data.mul_(0.1)
-            self.novelty = 0.
+        # # Init
+        # if init:
+        #     self.w_out.weight.data.mul_(0.1)
+        #     self.w_out.bias.data.mul_(0.1)
+        #     self.novelty = 0.
 
         self.to(self.args.device)
 
@@ -96,14 +100,19 @@ class Actor(nn.Module):
         # input = self.bnorm(input)
         out = self.w_l1(input)
         out = self.lnorm1(out)
-        out = out.tanh()
+        out = out.relu()
 
         # Hidden Layer 2
         out = self.w_l2(out)
         out = self.lnorm2(out)
-        out = out.tanh()
+        out = out.relu()
 
-        # Out
+        # Hidden Layer 2
+        out = self.w_l3(out)
+        out = self.lnorm3(out)
+        out = out.relu()
+
+        # output layer
         out = (self.w_out(out)).tanh()
         return out
 

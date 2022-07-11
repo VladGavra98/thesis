@@ -1,4 +1,3 @@
-from matplotlib import pyplot as plt
 from core import genetic_agent, mod_utils, replay_memory
 from core import mod_neuro_evo as utils_ne
 from core import ddpg as ddpg
@@ -53,7 +52,6 @@ class Agent:
             print('Using OU noise')
             self.noise_process = mod_utils.OUNoise(args.action_dim)
         else:
-            print('Using Gaussian noise')
             self.noise_process = mod_utils.GaussianNoise(args.action_dim, sd = args.noise_sd)
 
         # Initialise evolutionary loop
@@ -103,9 +101,10 @@ class Agent:
 
             # add exploratory noise
             if is_action_noise:
-                clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
-                action += clipped_noise
-                action = np.clip(action, -1.0, 1.0)
+                clipped_noise = (torch.randn_like(action) \
+                                 * self.args.noise_sd).clamp(-self.args.noise_clip, self.args.noise_clip)
+                # clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
+                action = np.clip(action + clipped_noise, -1.0, 1.0)
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
@@ -191,7 +190,6 @@ class Agent:
                                         store_transition = False) 
             test_scores.append(last_episode.reward)
 
-        # futures = dask.persist(*test_scores); test_scores = dask.compute(*futures)
         test_score = np.mean(test_scores)
         test_sd = np.std(test_scores)
 
@@ -210,6 +208,7 @@ class Agent:
         
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
         test_score = 1; test_sd = 1; 
+
         bcs_lst, lengths = [], []
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
@@ -244,14 +243,16 @@ class Agent:
             # NeuroEvolution's probabilistic selection and recombination step
             elite_index = self.evolver.epoch(self.pop, rewards)
 
-        ''' +++++++++++++++++++++++++++++++   RL (DDPG | TD3) ++++++++++++++++++++++++++++++++++++++'''
+        ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
         if self.args.pop_size == 0:
+            rewards = []
             print('Info: playing extra episodes with action nosie for RL training')
-            for _ in range(10):
+            for _ in range(5):
                 episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
                 lengths.append(episode.length)
-
+                rewards.append(episode.reward)
+            print('RL training reward:', np.average(rewards))
             ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
@@ -261,7 +262,6 @@ class Agent:
 
         # Validate rl separately
         rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
-
         self.rl_history = self.get_history(rl_episode)
 
         ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''

@@ -148,7 +148,7 @@ if __name__ == '__main__':
                 ep_num_lst.append(ep_num)
 
 
-    idx = -2
+    idx = -1
     # lon control episdoes 
     # if len(flst):
     #     plot_epiosde_lon(flst, ep_num_lst, idx, name = 'Champion')
