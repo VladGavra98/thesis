@@ -14,7 +14,7 @@ MAX_GRAD_NORM = 1
 
 
 level = logging.INFO
-logging.basicConfig(filename='/home/vlad/Documents/thesis/td3-erl/logs/tmp/debug_logger.txt',
+logging.basicConfig(filename='/home/vlad/Documents/thesis/td3-erl/tmp/T3_debug_logger.txt',
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
@@ -164,12 +164,16 @@ class TD3(object):
         if champion_policy is not None:
             policy_grad_loss = self.actor_update(state_batch)
             pgl = policy_grad_loss.data.cpu().numpy()
+            # smooth target updates 
+            soft_update(self.critic_target, self.critic, self.tau)
         else:
             pgl = None
             if iteration % self.args.policy_update_freq == 0:
                 soft_update(self.actor_target, self.actor, self.tau)
                 policy_grad_loss = self.actor_update(state_batch)
-
+                
+                # smooth target updates 
+                soft_update(self.critic_target, self.critic, self.tau)
                 pgl = policy_grad_loss.data.cpu().numpy()
 
         return pgl, TD_data
@@ -185,9 +189,6 @@ class TD3(object):
         policy_grad_loss.backward()
         nn.utils.clip_grad_norm_(self.actor.parameters(), MAX_GRAD_NORM)
         self.actor_optim.step()
-
-        # smooth target updates 
-        soft_update(self.critic_target, self.critic, self.tau)
 
         return policy_grad_loss
 

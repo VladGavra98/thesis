@@ -44,7 +44,7 @@ parser.add_argument('-test_operators', help='Test the variational operators', ac
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
-                    type=int, default=num_episodes//20)
+                    type=int, default=num_episodes//40)
 
 
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # strat trackers
     if cla.should_log:
         print('\033[1;32m WandB logging started')
-        run = wandb.init(project="pderl_phlab_longitudinal",
+        run = wandb.init(project="pderl_phlab",
                         entity="vgavra",
                         dir='../logs',
                         name=cla.run_name,
