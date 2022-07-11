@@ -1,0 +1,151 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.16
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.8.10
+    start_time: 1655301819
+    t:
+      1:
+      - 1
+      - 55
+      3:
+      - 13
+      - 16
+      4: 3.8.10
+      5: 0.12.16
+      8:
+      - 5
+actor_lr:
+  desc: null
+  value: 0.001
+alpha:
+  desc: null
+  value: 1
+batch_size:
+  desc: null
+  value: 100
+critic_lr:
+  desc: null
+  value: 0.001
+damp:
+  desc: null
+  value: 0.001
+damp_limit:
+  desc: null
+  value: 1.0e-05
+debug:
+  desc: null
+  value: false
+discount:
+  desc: null
+  value: 0.99
+elitism:
+  desc: null
+  value: false
+env:
+  desc: null
+  value: LunarLanderContinuous-v2
+epsilon:
+  desc: null
+  value: 0
+filename:
+  desc: null
+  value: ''
+gauss_sigma:
+  desc: null
+  value: 0.1
+k:
+  desc: null
+  value: 1
+layer_norm:
+  desc: null
+  value: false
+max_steps:
+  desc: null
+  value: 1000000
+mem_size:
+  desc: null
+  value: 1000000
+mode:
+  desc: null
+  value: train
+mult_noise:
+  desc: null
+  value: false
+n_episodes:
+  desc: null
+  value: 1
+n_eval:
+  desc: null
+  value: 10
+n_grad:
+  desc: null
+  value: 5
+n_noisy:
+  desc: null
+  value: 0
+n_test:
+  desc: null
+  value: 1
+noise_clip:
+  desc: null
+  value: 0.5
+ou_mu:
+  desc: null
+  value: 0.0
+ou_noise:
+  desc: null
+  value: false
+ou_sigma:
+  desc: null
+  value: 0.2
+ou_theta:
+  desc: null
+  value: 0.15
+output_folder:
+  desc: null
+  value: ../logs/wandb/run-20220615_160339-3n1g0q9q/files/LunarLanderContinuous-v2-run1
+period:
+  desc: null
+  value: 5000
+policy_freq:
+  desc: null
+  value: 2
+policy_noise:
+  desc: null
+  value: 0.2
+pop_size:
+  desc: null
+  value: 10
+render:
+  desc: null
+  value: false
+reward_scale:
+  desc: null
+  value: 1.0
+run_name:
+  desc: null
+  value: test1_with_imp_sampling
+save_all_models:
+  desc: null
+  value: false
+seed:
+  desc: null
+  value: -1
+sigma_init:
+  desc: null
+  value: 0.001
+start_steps:
+  desc: null
+  value: 10000
+tau:
+  desc: null
+  value: 0.005
+use_td3:
+  desc: null
+  value: true
