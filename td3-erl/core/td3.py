@@ -14,7 +14,7 @@ MAX_GRAD_NORM = 1
 
 
 level = logging.INFO
-logging.basicConfig(filename='/home/vlad/Documents/thesis/td3-erl/tmp/T3_debug_logger.txt',
+logging.basicConfig(filename='./tmp/T3_debug_logger.txt',
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
