@@ -211,10 +211,10 @@ class Agent:
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
         test_score = 1; test_sd = 1; 
         bcs_lst, lengths = [], []
-        rewards = np.zeros((self.args.num_evals, self.args.pop_size))
 
+        '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
         if len(self.pop):
-            '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
+            rewards = np.zeros((self.args.num_evals, self.args.pop_size))
             # Evaluate genomes/individuals
             # >>> loop over population AND store experiences
             for j,net in enumerate(self.pop):   
@@ -226,10 +226,8 @@ class Agent:
                     lengths.append(episode.length)
 
             # take average stats
-            # rewards = np.asarray(rewards).reshape((-1,self.args.pop_size))
-            bcs_lst = np.asarray(bcs_lst).reshape((-1,self.args.pop_size))
+            bcs_lst = np.asarray(bcs_lst).reshape((-1,self.args.pop_size)); bcs = np.mean(bcs_lst, axis = 0)
             rewards = np.mean(rewards, axis = 0) 
-            bcs     = np.mean(bcs_lst, axis = 0)
             ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
 
             # get popualtion stats

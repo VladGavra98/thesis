@@ -297,7 +297,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------
     if evaluate_rl:
         setattr(parameters, 'ls', 32)
-        rl_agent = load_rl_agent(parameters, ddpg_path)
+        rl_agent = load_rl_agent(parameters, path)
         reward_mean, reward_std, bcs = evaluate(rl_agent.actor, wrapper,
                     render=args.render, trials=num_trials,\
                     kwargs = extra_args)

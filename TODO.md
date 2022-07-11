@@ -65,25 +65,36 @@
 
 
 > week 16: 13/06 - 17/06
-- [ ] Implement TD3 agent:
+- [x] Implement TD3 agent:
   - [x] dueling Q-networks
   - [x] delayed updates
-  - [ ] target policy softening
-  - [ ] test on lunarlander
-- [ ] Add reward function to the PH-lab env
+  - [x] target policy softening
+  - [x] test on lunarlander
+- [x] Make PHlab to a gym-like envriornemnt
   
-  
+
+> week 17: 20/06 - 24/06
+- [x] Implement Dask parallelisation
+- [x] Add reward function
+
+> week 18: 27/06 - 01/07
+- [x] Presentation
+- [x] Test on longitudinal control 
+- [ ] Add episode bounds
 <!-- % \item Code a simple combination between QD and a ERL framework (most probably PD-ERL) -->
 
-## Prepare Presentation:
-- [ ] Schedule it
-- [ ] Gather other presentations
-- [ ] Motivation and aim
-- [ ] Literature review
-- [ ] Method
-- [ ] Preliminary results
+> week 19: 04/07 - 08/07
+- [x] PSimplify to TD3 on lon control
+  - [ ] tune yd3 actors and critics
+- [x] Test on longitudinal control 
 
+> week 30: 11/07 - 15/07
+- [ ] Run TD3-ERL on full attitude control for at least 500_000 frames
+- [ ] Connect via SSH to the remote station
+- [ ] Train TD3 on full attitude control 
+- [ ] Implement new reward regularization
 
+  
 
 # Ideas
 

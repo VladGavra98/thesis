@@ -43,7 +43,7 @@ class Parameters:
         self.use_ddpg = cla.use_ddpg   # default should be False
         self.frac_frames_train = 1
 
-        self.gamma = 0.98
+        self.gamma = 0.99
         self.lr    = 1e-3
         self.tau   = 0.005   
         self.seed  = cla.seed
@@ -54,7 +54,7 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_size = 64  # 64 for TD# only 
+        self.hidden_size = 64  # 64 for TD3 only 
         self.activation  = 'elu'
 
         self.learn_start = 20_000   # frames accumulated before grad updates            
@@ -70,12 +70,12 @@ class Parameters:
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 3      # minimum for TD3
-            self.lr  = 2e-3                  # overwrite lr for actor & critic 
+            self.lr  = 4e-4                  # overwrite lr for actor & critic 
         self.noise_clip = 0.5                # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
         # Number of actors in the population
-        self.pop_size = 10
+        self.pop_size = 0
         
         # Genetic memory size
         self.individual_bs = 10_000
