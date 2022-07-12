@@ -1,5 +1,9 @@
 from envs.phlabenv import CitationEnv
-from envs.lunarlander import LunarLanderWrapper
+
+try:
+    from envs.lunarlander import LunarLanderWrapper
+except:
+    print( 'LunarLanderContinunous not available on this machine.' )
 
 def select_env (environemnt_name : str):
     _name = environemnt_name
