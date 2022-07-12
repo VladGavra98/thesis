@@ -101,18 +101,14 @@ class Agent:
 
             # add exploratory noise
             if is_action_noise:
-                clipped_noise = (torch.randn_like(action) \
-                                 * self.args.noise_sd).clamp(-self.args.noise_clip, self.args.noise_clip)
-                # clipped_noise = np.clip(self.noise_process.noise(),-self.args.noise_clip, self.args.noise_clip)
+                clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
+                                        - self.args.noise_clip, self.args.noise_clip)
                 action = np.clip(action + clipped_noise, -1.0, 1.0)
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
             rewards.append(reward)
-
-            # Compute BCs:
-            # TODO: add code
-            bcs = (0.,0.)
+            action_lst.append(self.env.last_u)
 
             # Add experiences to buffer:
             if store_transition:
@@ -124,18 +120,25 @@ class Agent:
             else:
                 # save for future validation
                 state_lst.append(self.env.x)
-                action_lst.append(self.env.last_u)
+                
 
             # update agent obs
             obs = next_obs
 
+        # End env NOTE might be very relevant 
+        self.env.finish()
+
         # updated episodes if is done
         if store_transition: 
             self.num_episodes += 1
-        
+
+        # Compute BCs:
+        actions = np.asarray(action_lst)
+        bcs = np.std(actions, axis = 0)
+
         return Episode(reward = np.sum(rewards), bcs = bcs, length = info['t'],\
                        state_history=state_lst, ref_signals = info['ref'], \
-                       actions = action_lst,  reward_lst = rewards)
+                       actions = actions, reward_lst = rewards)
 
     def rl_to_evo(self, rl_agent: ddpg.DDPG or td3.TD3, evo_net: genetic_agent.GeneticAgent):
         for target_param, param in zip(evo_net.actor.parameters(), rl_agent.actor.parameters()):
@@ -183,12 +186,13 @@ class Agent:
     def validate_agent (self, agent : genetic_agent.Actor) -> Tuple[float, float, Episode]:
         """ Evaluate the  given actor and do NOT store these trials. 
         """
-        test_scores = []
+        test_scores, bcs = [], []
 
         for _ in range(self.validation_tests):
             last_episode = self.evaluate(agent, is_action_noise = False,\
                                         store_transition = False) 
             test_scores.append(last_episode.reward)
+            bcs.append(last_episode.bcs)
 
         test_score = np.mean(test_scores)
         test_sd = np.std(test_scores)
@@ -214,6 +218,8 @@ class Agent:
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
         if len(self.pop):
             rewards = np.zeros((self.args.num_evals, self.args.pop_size))
+            bcs = np.zeros((self.args.num_evals, self.args.pop_size,3))
+
             # Evaluate genomes/individuals
             # >>> loop over population AND store experiences
             for j,net in enumerate(self.pop):   
@@ -221,12 +227,13 @@ class Agent:
                     episode = self.evaluate(net, is_action_noise = False,\
                                                 store_transition = True)
                     rewards[i,j] = episode.reward
-                    bcs_lst.append(episode.bcs)
+                    bcs[i,j,:] = episode.bcs
                     lengths.append(episode.length)
 
             # take average stats
-            bcs_lst = np.asarray(bcs_lst).reshape((-1,self.args.pop_size)); bcs = np.mean(bcs_lst, axis = 0)
             rewards = np.mean(rewards, axis = 0) 
+            bcs = np.mean(bcs_lst, axis = 0)
+            print(bcs.shape)
             ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
 
             # get popualtion stats
@@ -246,21 +253,27 @@ class Agent:
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
         if self.args.pop_size == 0:
-            rewards = []
+            rl_extra_evals = 5
+            rewards = np.zeros((rl_extra_evals))
+            bcs     = np.zeros((rl_extra_evals,3))
+
             print('Info: playing extra episodes with action nosie for RL training')
-            for _ in range(5):
+            for i in range(rl_extra_evals):
                 episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
                 lengths.append(episode.length)
-                rewards.append(episode.reward)
+                rewards[i] = episode.reward
+                bcs[i,:] = episode.bcs
+
             print('RL training reward:', np.average(rewards))
+            # print('RL training bcs:', np.average(bcs, axis = 0))
             ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
-        # Gradient updates of RL actor and critic
+        # Gradient updates of RL actor and critic:
         rl_train_scores = self.train_rl()
 
-        # Validate rl separately
+        # Validate RL actor separately:
         rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
         self.rl_history = self.get_history(rl_episode)
 

@@ -50,14 +50,14 @@ class Parameters:
         self.batch_size = 128
         self.use_done_mask = True
         self.buffer_size = 200_000         
-        self.noise_sd = 0.2
+        self.noise_sd = 0.05
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
         self.hidden_sizes = [32,32,32]  # 64 for TD3-only 
         self.activation  = 'elu'        # elu/tanh 
 
-        self.learn_start = 20_000   # frames accumulated before grad updates            
+        self.learn_start = 10_000   # frames accumulated before grad updates            
         # self.total_steps = self.num_frames
 
         # Prioritised Experience Replay

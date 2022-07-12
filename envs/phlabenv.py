@@ -387,6 +387,12 @@ def evaluate(verbose : bool = False):
         rewards.append(reward)
 
 
+    # BCs:
+    actions = np.asarray(u_lst)
+    bcs = np.std(actions, axis = 0)
+
+    env.finish()
+    print('bcs:', bcs)
 
         
     return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
