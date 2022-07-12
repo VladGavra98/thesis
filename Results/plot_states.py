@@ -94,21 +94,21 @@ def plot_epiosde_full (flst, ep_num_lst, idx, name : str = None):
     fig, axs = plt.subplots(4,2)
     fig.suptitle(name + f' actor: episdoe {ep_num_lst[idx]}')
 
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$', linestyle = ':', color = colors[4])
+    axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$', color = colors[1])
     axs[0,0].plot(time,ref_signals[:,0], linestyle = '--',label = r'$\theta_{ref}$', color = colors[0])
     axs[0,0].set_ylabel(r'$\theta~[deg],q~[deg/s]$')
-    axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
+    # axs[0,0].plot(time,np.rad2deg(x_lst[:,4]), label = r'$\alpha$')
 
 
-    axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$')
-    axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$')
+    axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$', linestyle = ':', color = colors[4])
+    axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$', color = colors[1])
     axs[1,0].plot(time,ref_signals[:,1], linestyle = '--',label = r'$\phi_{ref}$', color = colors[0])
     axs[1,0].set_ylabel(r'$\phi~[deg],p~[deg/s]$')
 
 
-    axs[2,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$r$')
-    axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = r'$\beta$')
+    axs[2,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$r$',  linestyle = ':', color = colors[4])
+    axs[2,0].plot(time,np.rad2deg(x_lst[:,5]), label = r'$\beta$', color = colors[1])
     axs[2,0].plot(time,ref_signals[:,2], linestyle = '--',label = r'$\beta_{ref}$', color = colors[0])
     axs[2,0].set_ylabel(r'$\beta~[deg],r~[deg/s]$')
 

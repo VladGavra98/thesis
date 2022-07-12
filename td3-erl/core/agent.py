@@ -264,8 +264,7 @@ class Agent:
                 rewards[i] = episode.reward
                 bcs[i,:] = episode.bcs
 
-            print('RL training reward:', np.average(rewards))
-            # print('RL training bcs:', np.average(bcs, axis = 0))
+            print(f'RL training reward: {np.average(rewards):0.1f}')
             ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
