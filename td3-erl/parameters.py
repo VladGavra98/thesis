@@ -75,11 +75,13 @@ class Parameters:
 
         # =================================   NeuroEvolution Params =====================================
         # Number of actors in the population
-        self.pop_size = 0
+        self.pop_size = cla.pop_size
         
         # Genetic memory size
         self.individual_bs = 10_000
         if self.pop_size:
+            # champion is target actor
+            self.use_champion_target = False
 
             # increase buffer size for more experiences
             self.buffer_size*= self.pop_size//2

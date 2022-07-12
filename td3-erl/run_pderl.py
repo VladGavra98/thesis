@@ -22,6 +22,9 @@ parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2
 parser.add_argument('-use_ddpg', help='Wether to use DDPG in place of TD3 for the RL part.',action='store_true')
 parser.add_argument('-frames', help='Number of frames to learn from', default=num_frames, type=int)
 
+
+parser.add_argument('-pop_size', help='population size (if 0 than only RL part is learns)', default=10, type=int)
+
 parser.add_argument('-seed', help='Random seed to be used',type=int, default=7)
 parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
 parser.add_argument('-use_ounoise', help='Replace zero-mean Gaussian nosie with time-correletated OU noise', action='store_true')

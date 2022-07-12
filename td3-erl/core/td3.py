@@ -171,7 +171,6 @@ class TD3(object):
             if iteration % self.args.policy_update_freq == 0:
                 soft_update(self.actor_target, self.actor, self.tau)
                 policy_grad_loss = self.actor_update(state_batch)
-                
                 # smooth target updates 
                 soft_update(self.critic_target, self.critic, self.tau)
                 pgl = policy_grad_loss.data.cpu().numpy()

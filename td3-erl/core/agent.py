@@ -108,7 +108,7 @@ class Agent:
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
             rewards.append(reward)
-            action_lst.append(self.env.last_u)
+            action_lst.append(self.env.last_u)  # actuator deflection 
 
             # Add experiences to buffer:
             if store_transition:
@@ -170,7 +170,12 @@ class Agent:
 
         if len(self.replay_buffer) > self.args.learn_start: 
             
-            if self.champion_actor is not None: self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
+            if self.args.use_champion_target:
+                if self.champion_actor is not None:
+                    self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
+            else:
+                self.champion_actor = None 
+
             # agent has seen some experiences already
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
@@ -213,7 +218,7 @@ class Agent:
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
         test_score = 1; test_sd = 1; 
 
-        bcs_lst, lengths = [], []
+        lengths = []
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
         if len(self.pop):
@@ -232,8 +237,7 @@ class Agent:
 
             # take average stats
             rewards = np.mean(rewards, axis = 0) 
-            bcs = np.mean(bcs_lst, axis = 0)
-            print(bcs.shape)
+            bcs = np.mean(bcs, axis = 0)
             ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
 
             # get popualtion stats
@@ -343,5 +347,4 @@ class Agent:
                 self.rl_history, header = str(self.num_episodes))
 
         # NOTE might want to save RL state-history for future cheks
-        print('> state history in ' + str(filename) + '\n')
-        print("Progress Saved")
+        print('> Saved state history in ' + str(filename) + '\n')
