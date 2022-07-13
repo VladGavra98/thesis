@@ -71,7 +71,7 @@ class Actor(nn.Module):
         h1,h2,h3  = args.hidden_sizes
 
         # Input Layer 
-        self.bnorm = nn.BatchNorm1d(args.state_dim)  # batch norm
+        self.bnorm = nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True)  # instance norm layer -- similar to batch norm but works for instances too
         self.w_l1 = nn.Linear(args.state_dim, h1)
         self.lnorm1 = LayerNorm(h1)
 
@@ -95,9 +95,8 @@ class Actor(nn.Module):
         self.to(self.args.device)
 
     def forward(self, input):
-
         # Hidden Layer 1
-        # input = self.bnorm(input)
+        input = self.bnorm(input)
         out = self.w_l1(input)
         out = self.lnorm1(out)
         out = out.relu()

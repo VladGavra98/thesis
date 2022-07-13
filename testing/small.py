@@ -1,12 +1,11 @@
-import numpy as np
-rewards, bcs_lst, lengths = [], [], [] 
-i = 0
+import torch
+from torch import nn as nn
 
-pop_size = 10
-lst = []
-for i in range(10):
-    u = np.random.randn(5)
-    lst.append(u)
-lst = np.asarray(lst)
+# Without Learnable Parameters
+m = nn.InstanceNorm1d(100)
+# With Learnable Parameters
+m = nn.InstanceNorm1d(100, affine=True)
+input = torch.randn(1, 100, 2)
+output = m(input)
 
-print(lst)
+print(output.shape)

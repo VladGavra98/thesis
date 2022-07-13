@@ -80,20 +80,23 @@ class Agent:
                   agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
                   is_action_noise : bool,
                   store_transition : bool) -> Episode:
-        """ Play one game to evaualute the agent.
+        """ Play one game to evaluate the agent.
 
         Args:
             agent (GeneticAgentor): Agent class. 
-            is_action_noise (bool): Add OU noise to action.
+            is_action_noise (bool): Add Gaussian/OU noise to action.
             store_transition (bool, optional): Add frames to memory buffer for training. Defaults to True.
 
         Returns:
             Episode: data class with the episode stats
         """
-        # init states and env
+        # init states, env and 
         rewards, state_lst, action_lst = [],[], []
         obs = self.env.reset()
         done = False
+
+        # actor for evaluation 
+        agent.actor.eval()
 
         while not done: 
             # select action
@@ -168,14 +171,17 @@ class Agent:
         pgs_obj, TD_loss = [],[]
 
         if len(self.replay_buffer) > self.args.learn_start: 
-            
+            # prepare for training
+            self.rl_agent.actor.train()
+
+            # select target policy
             if self.args.use_champion_target:
                 if self.champion_actor is not None:
                     self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
             else:
                 self.champion_actor = None 
 
-            # agent has seen some experiences already
+            # train over generation experiences
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
 
