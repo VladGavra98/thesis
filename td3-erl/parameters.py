@@ -40,8 +40,12 @@ class Parameters:
         self.next_save = cla.next_save
 
         # ==================================  RL (DDPG) Params =============================================
-        self.use_ddpg = cla.use_ddpg   # default should be False
-        self.frac_frames_train = 1
+        self.use_ddpg = cla.use_ddpg     # default isFalse
+        self.test_ea = cla.test_ea
+        if self.test_ea:
+            self.frac_frames_train = 0.01  
+        else:
+            self.frac_frames_train = 1.  # default training 
 
         self.gamma = 0.99
         self.lr    = 1e-3
@@ -95,7 +99,7 @@ class Parameters:
             # Mutation and crossover
             self.crossover_prob = 0.0
             self.mutation_prob = 0.9
-            self.mutation_mag = 0.1
+            self.mutation_mag = 0.05    # NOTE CHANGED FROM 0.1
             self.mutation_batch_size = 256
             self.proximal_mut = cla.proximal_mut
             self.distil_crossover = cla.use_distil

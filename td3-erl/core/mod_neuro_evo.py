@@ -18,8 +18,11 @@ class SSNE:
         self.population_size = self.args.pop_size
         self.num_elitists = max(int(self.args.elite_fraction * args.pop_size),1)
         self.evaluate = evaluate
+
+        # testing stats
         self.stats = PopulationStats(self.args)
-        
+        self.mut_change = 0.0
+
         self.rl_policy = None
         self.selection_stats = {'elite': 0, 'selected': 0, 'discarded':0, 'total':0.0000001}
 
@@ -51,13 +54,13 @@ class SSNE:
             test_score_p1 = 0
             for eval in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode['reward']
+                test_score_p1 += episode.reward
             test_score_p1 /= trials
 
             test_score_p2 = 0
             for eval in range(trials):
                 episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode['reward']
+                test_score_p2 += episode.reward
             test_score_p2 /= trials
 
         for param1, param2 in zip(gene1.actor.parameters(), gene2.actor.parameters()):
@@ -96,13 +99,12 @@ class SSNE:
             test_score_c1 = 0
             for eval in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c1 += episode['reward']
-            test_score_c1 /= trials
+                test_score_c1 += episode.reward
 
             test_score_c2 = 0
             for eval in range(trials):
                 episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c2 += episode['reward']
+                test_score_c2 += episode.reward
             test_score_c2 /= trials
 
             if self.args.verbose_crossover:
@@ -134,33 +136,33 @@ class SSNE:
                 batch = new_agent.buffer.sample(batch_size)
                 losses.append(new_agent.update_parameters(batch, gene1.actor, gene2.actor, self.critic))
 
-        if self.args.opstat and self.stats.should_log():
+        if self.args.test_ea and self.args._verbose_crossover:
             test_score_p1 = 0
             trials = 5
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_p1 += episode.reward
             test_score_p1 /= trials
 
             test_score_p2 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
+                test_score_p2 += episode.reward
             test_score_p2 /= trials
 
             test_score_c = 0
-            for eval in range(trials):
-                episode = self.evaluate(new_agent, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(new_agent,  is_action_noise=False, store_transition=False)
+                test_score_c += episode.reward
             test_score_c /= trials
 
-            if self.args.verbose_crossover:
-                print("==================== Distillation Crossover ======================")
-                print("MSE Loss:", np.mean(losses[-40:]))
-                print("Parent 1", test_score_p1)
-                print("Parent 2", test_score_p2)
-                print("Crossover performance: ", test_score_c)
 
+            print("==================== Distillation Crossover ======================")
+            print(f"MSE Loss: {np.mean(losses[-40:]):0.2f}")
+            print(f"Parent 1: {test_score_p1:0.1f}")
+            print(f"Parent 2: {test_score_p2:0.1f}")
+            print(f"Child performance: {test_score_c:0.2f}")
+            print(f"Benefit: {test_score_c - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
             self.stats.add({
                 'cros_parent1_fit': test_score_p1,
                 'cros_parent2_fit': test_score_p2,
@@ -173,15 +175,10 @@ class SSNE:
     def proximal_mutate(self, gene: GeneticAgent, mag):
         # Based on code from https://github.com/uber-research/safemutations 
         trials = 5
-        if self.stats.should_log():
-            test_score_p = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p += episode['reward']
-            test_score_p /= trials
 
         model = gene.actor
 
+        # sample mutation batch
         batch = gene.buffer.sample(min(self.args.mutation_batch_size, len(gene.buffer)))
         state, _, _, _, _ = batch
         output = model(state)
@@ -190,13 +187,12 @@ class SSNE:
         tot_size = model.count_parameters()
         num_outputs = output.size()[1]
 
-
         # initial perturbation
         normal = dist.Normal(torch.zeros_like(params), torch.ones_like(params) * mag)
         delta = normal.sample()
 
-
-        # we want to calculate a jacobian of derivatives of each output's sensitivity to each parameter
+        # we want to calculate a jacobian of derivatives 
+        # of each output's sensitivity to each parameter
         jacobian = torch.zeros(num_outputs, tot_size).to(self.args.device)
         grad_output = torch.zeros(output.size()).to(self.args.device)
 
@@ -211,30 +207,42 @@ class SSNE:
 
         # summed gradients sensitivity
         scaling = torch.sqrt((jacobian**2).sum(0))
+        
         scaling[scaling == 0] = 1.0
         scaling[scaling < 0.01] = 0.01
         delta /= scaling
-        new_params = params + delta
 
+        #update child actor net
+        new_params = params + delta   
         model.inject_parameters(new_params)
 
-        if self.stats.should_log():
+        # test
+        if self.args.test_ea and self.args._verbose_mut:
+            test_score_p = 0
+            for _ in range(trials):
+                episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
+                test_score_p += episode.reward
+            test_score_p /= trials
+
             test_score_c = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
+                test_score_c += episode.reward
             test_score_c /= trials
 
             self.stats.add({
                 'mut_parent_fit': test_score_p,
                 'mut_child_fit': test_score_c,
             })
-
-            if self.args.verbose_mutation:
-                print("==================== Mutation ======================")
-                print("Fitness before: ", test_score_p)
-                print("Fitness after: ", test_score_c)
-                print("Mean mutation change:", torch.mean(torch.abs(new_params - params)).item())
+            self.mut_change = 0.1*self.mut_change + 0.9*(test_score_c - test_score_p)/(-test_score_p)*100
+            print("==================== Mutation ======================")
+            print(f"Parent: {test_score_p:0.1f}")
+            print(f"Child: {test_score_c:0.1f}")
+            print(f'Delta: {torch.mean(delta).item()}')
+            print(f'Average mutation change: {self.mut_change:0.2f} %')
+            print(f"Mean mutation change: from {torch.mean(torch.abs(params)).item():0.3f} /\
+                to {torch.mean(torch.abs(new_params)).item():0.3f} /\
+                by {torch.mean(torch.abs(new_params - params)).item():0.3f}")
 
     def clone(self, master: GeneticAgent, replacee: GeneticAgent):  # Replace the replacee individual with master
         """ Copy weights from master to replacee.
@@ -364,9 +372,8 @@ class SSNE:
                 # print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
                 self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
 
-
-        if self.stats.should_log():
-            self.stats.log()
+        # if self.stats.should_log():
+        #     self.stats.log()
         self.stats.reset()
 
         return new_elitists[0]
