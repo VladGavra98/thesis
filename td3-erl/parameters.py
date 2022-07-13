@@ -49,7 +49,7 @@ class Parameters:
         self.seed  = cla.seed
         self.batch_size = 128
         self.use_done_mask = True
-        self.buffer_size = 40_000         
+        self.buffer_size = 200_000         
         self.noise_sd = 0.2
         self.use_ounoise = cla.use_ounoise
 
