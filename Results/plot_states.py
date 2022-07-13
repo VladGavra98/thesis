@@ -27,7 +27,7 @@ savefig = True
 
 # Load state history data:
 # logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
-logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/latest-run/files/')
+logfolder = Path('./logs/wandb/latest-run/files/')
 
 
 def plot_epiosde_lon(flst, ep_num_lst, idx, name : str = None):

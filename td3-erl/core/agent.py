@@ -121,7 +121,6 @@ class Agent:
                 # save for future validation
                 state_lst.append(self.env.x)
                 
-
             # update agent obs
             obs = next_obs
 
