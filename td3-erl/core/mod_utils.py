@@ -3,8 +3,18 @@ from torch.autograd import Variable
 import random, pickle
 import numpy as np
 import torch
-import os
 import torch.nn as nn
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                                # Collection of Non-linear Activations
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+activations = {
+    'tanh': nn.Tanh(),
+    'elu' : nn.ELU(),
+    'relu': nn.LeakyReLU(),
+}
 
 
 class Memory:   # stored as ( s, a, r, s_ ) in SumTree

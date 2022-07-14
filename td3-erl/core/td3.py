@@ -5,7 +5,7 @@ from torch.optim import Adam
 
 from core import replay_memory
 from core.genetic_agent import Actor
-from core.mod_utils import hard_update, soft_update, LayerNorm
+from core.mod_utils import hard_update, soft_update, LayerNorm, activations
 
 from typing import Tuple, Dict, List
 import logging
@@ -30,7 +30,7 @@ class Critic(nn.Module):
         l1 = 64; l2 = 64;            # NOTE these worked for TD3-only control 
         
         # Non-linearity:
-        self.activation = torch.tanh if 'tanh' in self.args.activation else F.elu
+        self.activation = activations[self.args.activation_actor.lower()]
 
         # Critic 1
         self.bnorm_1 = nn.BatchNorm1d(args.state_dim + args.action_dim)  # batch norm

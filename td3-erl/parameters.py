@@ -58,9 +58,10 @@ class Parameters:
         self.use_ounoise = cla.use_ounoise
 
         # hidden layer
-        self.hidden_sizes = [32,32,32]    # 64 for TD3-only 
-        self.activation  = 'elu'          # critic only elu/tanh 
-
+        self.num_layers = 3
+        self.hidden_size = 32    # 64 for TD3-only 
+        self.activation_actor   = 'relu'
+        self.activation_critic  = 'elu'  
         self.learn_start = 10_000       # frames accumulated before grad updates            
         # self.total_steps = self.num_frames
 
