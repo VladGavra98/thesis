@@ -167,10 +167,11 @@ class Agent:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
             The frames are sampled from the common buffer.
         """
-        print('Train RL agent ...')
+        
         pgs_obj, TD_loss = [],[]
 
         if len(self.replay_buffer) > self.args.learn_start: 
+            print('Train RL agent ...')
             # prepare for training
             self.rl_agent.actor.train()
 
