@@ -10,12 +10,13 @@ from typing import List, Dict, Tuple
 from tqdm import tqdm
 import os
 
+
 @dataclass                                                                                                                                      
 class Episode: 
     """ Output of one episode. 
     """                                                                                                                     
-    reward        : np.float64                                                                                                                             
-    bcs           : Tuple[np.float64]                                                                                                                           
+    bcs : Tuple[np.float64]                                                                                                                           
+    reward : float                                                                                                                         
     length        : np.float64 
     state_history : List
     ref_signals   : List
