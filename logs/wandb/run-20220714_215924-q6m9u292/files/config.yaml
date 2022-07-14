@@ -8,12 +8,9 @@ _wandb:
     is_jupyter_run: false
     is_kaggle_kernel: false
     python_version: 3.8.10
-    start_time: 1657817508
+    start_time: 1657828764
     t:
       1:
-      - 1
-      - 55
-      2:
       - 1
       - 55
       3:
@@ -33,10 +30,10 @@ activation_critic:
   value: elu
 batch_size:
   desc: null
-  value: 129
+  value: 103
 buffer_size:
   desc: null
-  value: 146724
+  value: 218894
 device:
   desc: null
   value: cuda
@@ -48,10 +45,10 @@ frac_frames_train:
   value: 1.0
 gamma:
   desc: null
-  value: 0.9726067249026764
+  value: 0.9832795963894956
 hidden_size:
   desc: null
-  value: 23
+  value: 50
 individual_bs:
   desc: null
   value: 10000
@@ -60,13 +57,13 @@ learn_start:
   value: 10000
 lr:
   desc: null
-  value: 0.0013978503323350336
+  value: 0.001636133400733816
 noise_clip:
   desc: null
   value: 0.5
 noise_sd:
   desc: null
-  value: 0.22651530453544544
+  value: 0.2958669454184154
 ns:
   desc: null
   value: false
@@ -78,7 +75,7 @@ num_frames:
   value: 800000
 num_layers:
   desc: null
-  value: 1
+  value: 4
 per:
   desc: null
   value: false
