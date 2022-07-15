@@ -1,0 +1,1 @@
+{"best_train_fitness": 1, "test_score": 1, "test_sd": 1, "pop_avg": 1, "pop_min": 1, "elite_index": -1, "rl_reward": NaN, "rl_std": NaN, "avg_ep_len": 0.02, "ep_len_sd": 0.0, "PG_obj": null, "TD_loss": null, "pop_novelty": 0.0, "frames": 769195, "episodes": 203772, "time": 9466.383241176605, "_timestamp": 1657850535, "_runtime": 9469, "_step": 33961}
