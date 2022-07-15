@@ -1,7 +1,7 @@
 import numpy as np
 import time
 import random
-from core import my_agent
+from core import agent
 import torch
 import argparse
 from parameters import Parameters
@@ -61,34 +61,20 @@ if __name__ == "__main__":
     parameters.write_params(stdout=True)
 
     # Create Agent
-    my_agent = my_agent.Agent(parameters, env)
+    agent = agent.Agent(parameters, env)
     print('Running', parameters.env_name, ' State_dim:',
           parameters.state_dim, ' Action_dim:', parameters.action_dim)
 
     # Main training loop:
     start_time = time.time()
     
-    while my_agent.num_frames <= parameters.num_frames:
+    while agent.num_frames <= parameters.num_frames:
 
         # evaluate over all episodes
-        stats = my_agent.train()
-
-        # print('Epsiodes:', agent.num_episodes, 'Frames:', agent.num_frames,
-        #       ' Train Max:', '%.2f' % stats['best_train_fitness'] if stats['best_train_fitness'] is not None else None,
-        #       ' Test Max:', '%.2f' % stats['test_score'] if stats['test_score'] is not None else None,
-        #       ' Test SD:', '%.2f' % stats['test_sd'] if stats['test_sd'] is not None else None,
-        #       ' Population Avg:', '%.2f' % stats['pop_avg'],
-        #       ' Weakest :', '%.2f' % stats['pop_min'],
-        #       '\n',
-        #       ' Avg. ep. len:', '%.2fs' % stats['avg_ep_len'],
-        #       ' RL Reward:', '%.2f' % stats['rl_reward'],
-        #       ' PG Objective:', '%.4f' % stats['PG_obj'],
-        #       ' TD Loss:', '%.4f' % stats['TD_loss'],
-        #       '\n')
-
+        stats = agent.train()
 
         # Update loggers:
-        stats['frames'] = my_agent.num_frames; stats['episodes'] = my_agent.num_episodes
+        stats['frames'] = agent.num_frames; stats['episodes'] = agent.num_episodes
         stats['time'] = time.time() - start_time
 
 
