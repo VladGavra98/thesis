@@ -229,7 +229,7 @@ class CitationEnv(BaseEnv):
 
     def get_reward(self) -> float:
         self.calc_error()
-        reward_vec = np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
+        reward_vec = np.abs(np.clip(self.cost * self.error,-self.max_bound, self.max_bound))
         reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
         return reward
     

@@ -101,7 +101,7 @@ class Parameters:
             self.crossover_prob = 0.0
             self.mutation_prob = 0.9
             self.mutation_mag = 0.05    # NOTE CHANGED FROM 0.1
-            self.mutation_batch_size = 256
+            self.mutation_batch_size = self.batch_size
             self.proximal_mut = cla.proximal_mut
             self.distil_crossover = cla.use_distil
             self.distil_type = cla.distil_type

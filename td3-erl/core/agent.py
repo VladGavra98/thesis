@@ -136,7 +136,7 @@ class Agent:
 
         # Compute BCs:
         actions = np.asarray(action_lst)
-        bcs = np.std(actions, axis = 0)
+        bcs = np.sum(np.abs(actions), axis = 0)
 
         return Episode(reward = np.sum(rewards), bcs = bcs, length = info['t'],\
                        state_history=state_lst, ref_signals = info['ref'], \
@@ -152,16 +152,9 @@ class Agent:
         for target_param, param in zip(rl_net.parameters(), evo_net.parameters()):
             target_param.data.copy_(param.data)
 
-    def get_pop_novelty(self):
-        epochs = self.args.ns_epochs
-        novelties = np.zeros(len(self.pop))
-        for _ in range(epochs):
-            transitions = self.replay_buffer.sample(self.args.batch_size)
-            batch = replay_memory.Transition(*zip(*transitions))
-            # each agent novelty
-            for i, net in enumerate(self.pop):
-                novelties[i] += (net.get_novelty(batch))
-        return novelties / epochs
+
+    def get_pop_novelty(self, bcs : np.array):
+        return np.sum(np.std(bcs, axis = 0))/bcs.shape[1]
 
     def train_rl(self) -> Dict[float, float]:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
@@ -242,7 +235,7 @@ class Agent:
 
             # take average stats
             rewards = np.mean(rewards, axis = 0) 
-            bcs = np.mean(bcs, axis = 0)
+            bcs     = np.mean(bcs, axis = 0)
             ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
 
             # get popualtion stats
@@ -257,7 +250,7 @@ class Agent:
             self.champion_history = self.get_history(last_episode)
 
             # NeuroEvolution's probabilistic selection and recombination step
-            elite_index = self.evolver.epoch(self.pop, rewards)
+            elite_index = self.evolver.epoch(self.pop, rewards, bcs)
 
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
@@ -298,8 +291,7 @@ class Agent:
             print('Sync from RL --> Evolution')
 
         # # Get popualtion nvelty:
-        # TODO: chek this later
-        # pop_novelty = self.get_pop_novelty()
+        pop_novelty = self.get_pop_novelty(bcs)
         # -------------------------- Collect statistics --------------------------
         return {
             'best_train_fitness': best_train_fitness,
@@ -314,7 +306,7 @@ class Agent:
             'ep_len_sd':   ep_len_sd, 
             'PG_obj':      rl_train_scores['PG_obj'],
             'TD_loss':     rl_train_scores['TD_loss'],
-            'pop_novelty': 0.,
+            'pop_novelty': pop_novelty ,
         }
 
 
@@ -353,3 +345,16 @@ class Agent:
 
         # NOTE might want to save RL state-history for future cheks
         print('> Saved state history in ' + str(filename) + '\n')
+
+
+
+    # def get_pop_novelty(self): OLD
+    #     epochs = self.args.ns_epochs
+    #     novelties = np.zeros(len(self.pop))
+    #     for _ in range(epochs):
+    #         transitions = self.replay_buffer.sample(self.args.batch_size)
+    #         batch = replay_memory.Transition(*zip(*transitions))
+    #         # each agent novelty
+    #         for i, net in enumerate(self.pop):
+    #             novelties[i] += (net.get_novelty(batch))
+    #     return novelties / epochs

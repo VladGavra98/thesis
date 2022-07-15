@@ -106,6 +106,7 @@ if __name__ == "__main__":
               ' Test SD:', '%.2f' % stats['test_sd'] if stats['test_sd'] is not None else None,
               ' Population Avg:', '%.2f' % stats['pop_avg'],
               ' Weakest :', '%.2f' % stats['pop_min'],
+              ' Novelty :', '%.2f' % stats['pop_novelty'],
               '\n',
               ' Avg. ep. len:', '%.2fs' % stats['avg_ep_len'],
               ' RL Reward:', '%.2f' % stats['rl_reward'],
