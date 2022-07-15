@@ -50,18 +50,7 @@ class SSNE:
     def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
         # Evaluate the parents
         trials = 5
-        if self.args.opstat and self.stats.should_log():
-            test_score_p1 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode.reward
-            test_score_p1 /= trials
 
-            test_score_p2 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode.reward
-            test_score_p2 /= trials
 
         for param1, param2 in zip(gene1.actor.parameters(), gene2.actor.parameters()):
             # References to the variable tensors
@@ -95,32 +84,49 @@ class SSNE:
                         W2[ind_cr] = W1[ind_cr]
 
         # Evaluate the children
-        if self.args.opstat and self.stats.should_log():
+
+        if self.args.test_ea and self.args._verbose_crossover:
+            test_score_p1 = 0
+            for eval in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_p1 += episode.reward
+            test_score_p1 /= trials
+
+            test_score_p2 = 0
+            for eval in range(trials):
+                episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
+                test_score_p2 += episode.reward
+            test_score_p2 /= trials
+
             test_score_c1 = 0
             for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c1 += episode.reward
 
             test_score_c2 = 0
             for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c2 += episode.reward
             test_score_c2 /= trials
 
-            if self.args.verbose_crossover:
-                print("==================== Classic Crossover ======================")
-                print("Parent 1", test_score_p1)
-                print("Parent 2", test_score_p2)
-                print("Child 1", test_score_c1)
-                print("Child 2", test_score_c2)
+  
+            print("==================== Classic Crossover ======================")
+            print(f"Parent 1: {test_score_p1:0.1f}")
+            print(f"Parent 2: {test_score_p2:0.1f}")
+            print(f"Child1 performance: {test_score_c1:0.2f}")
+            print(f"Child2 performance: {test_score_c2:0.2f}")
+            print(f"Benefit1: {test_score_c1 - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
+            print(f"Benefit1: {test_score_c2 - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
 
-            self.stats.add({
-                'cros_parent1_fit': test_score_p1,
-                'cros_parent2_fit': test_score_p2,
-                'cros_child_fit': np.mean([test_score_c1, test_score_c2]),
-                'cros_child1_fit': test_score_c1,
-                'cros_child2_fit': test_score_c2,
-            })
+
+            # self.stats.add({
+            #     'cros_parent1_fit': test_score_p1,
+            #     'cros_parent2_fit': test_score_p2,
+            #     'cros_child_fit': np.mean([test_score_c1, test_score_c2]),
+            #     'cros_child1_fit': test_score_c1,
+            #     'cros_child2_fit': test_score_c2,
+            # })
+
     def distilation_crossover(self, gene1: GeneticAgent, gene2: GeneticAgent) -> GeneticAgent:
         new_agent = GeneticAgent(self.args)
         new_agent.buffer.add_latest_from(gene1.buffer, self.args.individual_bs // 2)
@@ -162,12 +168,13 @@ class SSNE:
             print(f"Parent 1: {test_score_p1:0.1f}")
             print(f"Parent 2: {test_score_p2:0.1f}")
             print(f"Child performance: {test_score_c:0.2f}")
-            print(f"Benefit: {test_score_c - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
-            self.stats.add({
-                'cros_parent1_fit': test_score_p1,
-                'cros_parent2_fit': test_score_p2,
-                'cros_child_fit': test_score_c,
-            })
+            print(f"Benefit: {test_score_c - 0.5*(test_score_p1 + test_score_p2) :0.2f} (>0 is better)")
+            
+            # self.stats.add({
+            #     'cros_parent1_fit': test_score_p1,
+            #     'cros_parent2_fit': test_score_p2,
+            #     'cros_child_fit': test_score_c,
+            # })
 
         return new_agent
 
