@@ -85,24 +85,24 @@ class SSNE:
 
         if self.args.test_ea and self.args._verbose_crossover:
             test_score_p1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_p1 += episode.reward
             test_score_p1 /= trials
 
             test_score_p2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
                 test_score_p2 += episode.reward
             test_score_p2 /= trials
 
             test_score_c1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c1 += episode.reward
 
             test_score_c2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c2 += episode.reward
             test_score_c2 /= trials
@@ -178,8 +178,6 @@ class SSNE:
     
     def proximal_mutate(self, gene: GeneticAgent, mag):
         # Based on code from https://github.com/uber-research/safemutations 
-        trials = 5
-
         model = gene.actor
 
         # sample mutation batch
@@ -222,6 +220,7 @@ class SSNE:
 
         # test
         if self.args.test_ea and self.args._verbose_mut:
+            trials = 5
             test_score_p = 0
             for _ in range(trials):
                 episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
@@ -278,10 +277,9 @@ class SSNE:
     @staticmethod
     def sort_groups_by_novelty(genomes, bcs):
         groups = []
-        for i, first in enumerate(genomes):
-            for j, second in enumerate(genomes[i+1:]):
+        for i,first in enumerate(genomes):
+            for  _,second in enumerate(genomes[i+1:]):
                 groups.append((second, first, SSNE.get_novelty(bcs, first, second)))
-
         return sorted(groups, key=lambda group: group[2], reverse=True)
 
     @staticmethod

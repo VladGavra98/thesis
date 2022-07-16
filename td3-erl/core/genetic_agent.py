@@ -96,52 +96,12 @@ class Actor(nn.Module):
         ])
             
         self.net = nn.Sequential(*layers)
-
-        # self.w_l1 = nn.Linear(args.state_dim, h1)
-        # self.lnorm1 = LayerNorm(h1)
-
-        # # Hidden Layer 1
-        # self.w_l2 = nn.Linear(h1, h2)
-        # self.lnorm2 = LayerNorm(h2)
-
-        # # Hidden Layer 2
-        # self.w_l3 = nn.Linear(h2, h3)
-        # self.lnorm3 = LayerNorm(h3)
-
-        # # Out
-        # self.w_out = nn.Linear(h3, args.action_dim)
-
-        # # Init
-        # if init:
-        #     self.w_out.weight.data.mul_(0.1)
-        #     self.w_out.bias.data.mul_(0.1)
-        #     self.novelty = 0.
-
         self.to(args.device)
 
-    def forward(self, state):
-        # # Hidden Layer 1
-        # input = self.bnorm(input)
-        # out = self.w_l1(input)
-        # out = self.lnorm1(out)
-        # out = out.relu()
-
-        # # Hidden Layer 2
-        # out = self.w_l2(out)
-        # out = self.lnorm2(out)
-        # out = out.relu()
-
-        # # Hidden Layer 2
-        # out = self.w_l3(out)
-        # out = self.lnorm3(out)
-        # out = out.relu()
-
-        # # output layer
-        # out = (self.w_out(out)).tanh()
-
+    def forward(self, state : torch.tensor) -> torch.tensor:
         return self.net(state)
 
-    def select_action(self, state):
+    def select_action(self, state : torch.tensor):
         state = torch.FloatTensor(state.reshape(1, -1)).to(self.args.device)
         return self.forward(state).cpu().data.numpy().flatten()
 
@@ -181,6 +141,7 @@ class Actor(nn.Module):
     def inject_parameters(self, pvec):
         count = 0
         for name, param in self.named_parameters():
+            # only alter W -- skip norms and biases
             if is_lnorm_key(name) or len(param.shape) != 2:
                 continue
             sz = param.numel()
