@@ -128,7 +128,7 @@ class CitationEnv(BaseEnv):
         if self.n_actions == 1:
             self.cost = 6/np.pi*np.array([1.])  # individual reward scaler [theta]
         else:
-            self.cost = 6/np.pi*np.array([1., 1.,1.])     # scaler [theta, phi, beta]
+            self.cost = 6/np.pi*np.array([1., 1.,4.])     # scaler [theta, phi, beta]
         self.reward_scale = -1/3                          # scaler
         self.cost         = self.cost[:self.n_actions]
         self.max_bound    = np.ones(self.error.shape)     # bounds
@@ -143,8 +143,8 @@ class CitationEnv(BaseEnv):
     @property
     def observation_space(self) -> Box:
         return Box(
-            low   = -10 * np.ones(self.n_obs),
-            high  =  10 * np.ones(self.n_obs),
+            low   = -30 * np.ones(self.n_obs),
+            high  =  30 * np.ones(self.n_obs),
             dtype = np.float64,
         )
     @property
