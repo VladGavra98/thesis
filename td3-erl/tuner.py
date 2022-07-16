@@ -18,14 +18,14 @@ parser = argparse.ArgumentParser()
 
 
 parser.add_argument('--run_name', default='test', type=str)
-parser.add_argument('--gamma', type = float)
-parser.add_argument('--lr', type = float)
-parser.add_argument('--num_layers', type = int)
-parser.add_argument('--hidden_size', type = int)
-parser.add_argument('--buffer_size', type = int)
-parser.add_argument('--batch_size', type = int)
+parser.add_argument('--gamma', default = 0.98, type = float)
+parser.add_argument('--lr', default = 0.001, type = float)
+parser.add_argument('--num_layers', default =2, type = int)
+parser.add_argument('--hidden_size', default =32, type = int)
+parser.add_argument('--buffer_size', default = 200000, type = int)
+parser.add_argument('--batch_size', default = 64, type = int)
 
-parser.add_argument('--noise_sd', type = float)
+parser.add_argument('--noise_sd', default = 0.2, type = float)
 
 
 if __name__ == "__main__":

@@ -304,11 +304,11 @@ class CitationEnv(BaseEnv):
 
         if self.t >= self.t_max \
             or np.abs(self.theta) > self.max_theta \
-            or np.abs(self.phi)   > self.max_phi :
+            or np.abs(self.phi)   > self.max_phi:
 
             is_done = True
             reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
-   
+
         if np.any(np.isnan(self.x)):
             print('NaN encountered: ', self.x)
             is_done = True
