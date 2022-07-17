@@ -128,7 +128,7 @@ class CitationEnv(BaseEnv):
         if self.n_actions == 1:
             self.cost = 6/np.pi*np.array([1.])  # individual reward scaler [theta]
         else:
-            self.cost = 6/np.pi*np.array([1., 1.,1.])     # scaler [theta, phi, beta]
+            self.cost = 6/np.pi*np.array([1., 1.,4.])     # scaler [theta, phi, beta]
         self.reward_scale = -1/3                          # scaler
         self.cost         = self.cost[:self.n_actions]
         self.max_bound    = np.ones(self.error.shape)     # bounds
