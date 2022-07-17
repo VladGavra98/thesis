@@ -76,6 +76,19 @@ class CitationEnv(BaseEnv):
     n_obs_full : int = 12
 
     def __init__(self, configuration : str = None):
+        if 'symmetric'  in configuration.lower():
+            print('Symmetric control only.')
+            self.n_actions = 1                  # theta
+            self.obs_idx   = [1]                # q
+        elif 'attitude' in configuration.lower():
+            print('Attitude control.')
+            self.n_actions = 3                  # de, da, dr
+            self.obs_idx = [0,1,2]              # all but no xe,ye
+        else:
+            print('Full state control.')
+            self.n_actions = 3
+            self.obs_idx = range(10)            # all states         
+
         self.t = 0
         self.dt = 0.01      # [s]
         self.t_max = 20.0   # [s]
@@ -86,15 +99,13 @@ class CitationEnv(BaseEnv):
         # 6,  7, 8   -> phi, theta, psi
         # 9, 10, 11  -> he, xe, ye
         self.x: np.ndarray       = None    # aircraft state vector 
-        self.obs: np.ndarray     = None    # observation vector -- used for configurations & learning
-        self.obs_idx:List[int]   = None   
+        self.obs: np.ndarray     = None    # observation vector -- used for configurations & learning 
 
         # Have an internal storage of last action [10]
         # Inputs:
         #   0 de      , 1 da      , 2 dr
         #   3 trim de , 4 trim da , 5 trim dr
         #   6 df      , 7 gear    , 8 throttle1 9 throttle2
-        self.n_actions : int    = None
         self.last_u: np.ndarray = None
 
         # refference to track
@@ -106,21 +117,6 @@ class CitationEnv(BaseEnv):
         # state bounds
         self.max_theta = np.deg2rad(60.)
         self.max_phi = np.deg2rad(75.)
-
-        if 'symmetric'  in configuration.lower():
-            print('Symmetric control only.')
-            self.n_actions = 1                  # theta
-            self.obs_idx   = [1]              # q, V, alpha
-
-        elif 'attitude' in configuration.lower():
-            print('Attitude control.')
-            self.n_actions = 3                  # de, da, dr
-            self.obs_idx = [0,1,2]        # all but no xe,ye
-
-        else:
-            print('Full state control.')
-            self.n_actions = 3
-            self.obs_idx = range(10)            # all states         
 
         # observation space: aircraft state + actuator state + control states (equal to actuator states)
         self.n_obs : int = len(self.obs_idx) + 2 * self.n_actions 
@@ -142,17 +138,15 @@ class CitationEnv(BaseEnv):
         return Box(
             low   = -self.rate_bound * np.ones(self.n_actions),
             high  =  self.rate_bound * np.ones(self.n_actions),
-            dtype = np.float64,
+            dtype =  np.float64,
         )
-
     @property
     def observation_space(self) -> Box:
         return Box(
-            low   = -10 * np.ones(self.n_obs),
-            high  =  10 * np.ones(self.n_obs),
+            low   = -30 * np.ones(self.n_obs),
+            high  =  30 * np.ones(self.n_obs),
             dtype = np.float64,
         )
-
     @property
     def p(self) -> float:  # roll rate
         return self.x[0]
@@ -212,7 +206,7 @@ class CitationEnv(BaseEnv):
             
             step_phi =  RandomizedCosineStepSequence(
                         t_max=self.t_max,
-                        ampl_max=30,
+                        ampl_max=20,
                         block_width=4.0,
                         smooth_width=3.0,
                         n_levels=10,
@@ -242,8 +236,6 @@ class CitationEnv(BaseEnv):
     def filter_action(self, action : np.ndarray, tau : float = 1) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
-        # w_0 = 2 * 2 * np.pi  # rad/s
-        # u = self.last_u / (1 + w_0 * self.dt) + action * (w_0 * self.dt) / (1 + w_0 * self.dt)
         return (1 - tau) * self.last_u + tau * action * self.dt
 
     def check_envelope_bounds():
@@ -302,7 +294,7 @@ class CitationEnv(BaseEnv):
         self.x = citation.step(_input)
         
         # Reward using clipped error
-        reward   = self.get_reward()
+        reward = self.get_reward()
 
         # Update observation based on perfect observations & actuator state
         self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
@@ -310,13 +302,18 @@ class CitationEnv(BaseEnv):
         # Step time
         self.t  += self.dt
 
-        if self.t >= self.t_max or np.abs(self.theta) > self.max_theta \
-            or np.abs(self.phi) > self.max_phi  or self.H < 200:
-            if np.any(np.isnan(self.x)):
-                print('NaN encountered: ', self.x)
+        if self.t >= self.t_max \
+            or np.abs(self.theta) > self.max_theta \
+            or np.abs(self.phi)   > self.max_phi :
+
             is_done = True
             reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
    
+        if np.any(np.isnan(self.x)):
+            print('NaN encountered: ', self.x)
+            is_done = True
+            reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
+        
         # info:
         info = {
             "ref": self.ref,
@@ -354,7 +351,6 @@ def evaluate(verbose : bool = False):
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
     error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
     
-
     while not done:
         u_lst.append(env.last_u)
         x_lst.append(env.x)
@@ -393,6 +389,12 @@ def evaluate(verbose : bool = False):
         rewards.append(reward)
 
 
+    # BCs:
+    actions = np.asarray(u_lst)
+    bcs = np.std(actions, axis = 0)
+
+    env.finish()
+    print('bcs:', bcs)
 
         
     return ref_beta,ref_theta,ref_phi,x_lst,rewards,u_lst,nz_lst
