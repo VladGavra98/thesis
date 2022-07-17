@@ -115,7 +115,7 @@ class Parameters:
         # Save Results
         self.state_dim = None   # To be initialised externally
         self.action_dim = None  # To be initialised externally
-        self.save_foldername = './logs/tmp/'
+        self.save_foldername = './tmp/'
 
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
