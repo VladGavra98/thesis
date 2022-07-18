@@ -74,7 +74,7 @@ class Parameters:
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 3      # minimum for TD3
-            self.lr  = 1e-3                  # overwrite lr for actor & critic 
+           
         self.noise_clip = 0.5                # default for TD3
 
         # =================================   NeuroEvolution Params =====================================
