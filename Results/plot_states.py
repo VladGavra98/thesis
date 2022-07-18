@@ -27,8 +27,8 @@ savefig = True
 
 # Load state history data:
 # logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
-logfolder = Path('./logs/wandb/latest-run/files/')
-
+logfolder = Path('./logs/wandb/run-20220716_204858-1kohamp1')
+logfolder = logfolder / Path('files/')
 
 def plot_epiosde_lon(flst, ep_num_lst, idx, name : str = None):
     
@@ -148,7 +148,7 @@ if __name__ == '__main__':
                 ep_num_lst.append(ep_num)
 
 
-    idx = -1
+    idx = -2
     # lon control episdoes 
     # if len(flst):
     #     plot_epiosde_lon(flst, ep_num_lst, idx, name = 'Champion')

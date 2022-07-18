@@ -285,6 +285,9 @@ class CitationEnv(BaseEnv):
 
         # pad action to correpond to the Simulink dimensions
         action = self.scale_action(action)   # scaled to actuator limits 
+        if self.t < 0.2:
+            action[:] = np.array([-0.025,0.,0.])
+
 
         # incremental control input: 
         u = self.filter_action(action, tau = 1.)
