@@ -229,20 +229,20 @@ class CitationEnv(BaseEnv):
 
     def get_reward(self) -> float:
         self.calc_error()
-        reward_vec = np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
+        reward_vec = np.abs(np.clip(self.cost * self.error,-self.max_bound, self.max_bound))
         reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
         return reward
     
-    def filter_action(self, action : np.ndarray, tau : float = 1) -> np.ndarray:
+    def incremental_control(self, action : np.ndarray) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
-        return (1 - tau) * self.last_u + tau * action * self.dt
+        return self.last_u + action * self.dt
 
     def check_envelope_bounds():
         raise NotImplementedError
 
     def pad_action(self, action : np.ndarray) -> np.ndarray:
-        """ Pad the non-calculated deflection valeus with 0. 
+        """ Pad action with 0 to correpond to the Simulink dimensions. 
         """
         citation_input = np.pad(action,
                                 (0, self.n_actions_full - self.n_actions), 
@@ -283,14 +283,17 @@ class CitationEnv(BaseEnv):
         """        
         is_done = False
 
-        # pad action to correpond to the Simulink dimensions
-        action = self.scale_action(action)   # scaled to actuator limits 
+        # sclae action to actuator rate bounds 
+        if self.t < 0.2:
+            action = np.array([0.,0.,0.])
+        else:
+            action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action, tau = 1.)
-        self.last_u = u
+        u = self.incremental_control(action)
 
-        _input = self.pad_action(action)
+        # citation input 
+        _input = self.pad_action(u)
         self.x = citation.step(_input)
         
         # Reward using clipped error
@@ -298,6 +301,7 @@ class CitationEnv(BaseEnv):
 
         # Update observation based on perfect observations & actuator state
         self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
+        self.last_u = u
 
         # Step time
         self.t  += self.dt
@@ -345,7 +349,7 @@ def evaluate(verbose : bool = False):
     obs = env.reset()
 
     # PID gains
-    p, i, d = 20, 6,5
+    p, i, d = 6, 6,5
     
     ref_beta, ref_theta, ref_phi = [], [], []
     x_lst, rewards,u_lst, nz_lst = [],[], [], []
@@ -359,14 +363,15 @@ def evaluate(verbose : bool = False):
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
 
+
         if action.shape[0] > 1:
             action[-1]*=-1.5  # rudder needs some scaling
         error_dev  = obs[:env.n_actions]
 
         if verbose:
+            print(f'Action: {action} -> deflection: {env.last_u}')
             print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
             
-
         # Simulate one step in environment
         action = np.clip(action,-1,1)
         obs, reward, done, info = env.step(action.flatten())
@@ -408,8 +413,9 @@ if __name__=='__main__':
     env = config.select_env('phlab_attitude')
 
     
-    trials = 10
-    verbose = False
+    trials = 1
+    verbose = True
+
     fitness_lst =[]
     for _ in tqdm(range(trials)):
         ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)

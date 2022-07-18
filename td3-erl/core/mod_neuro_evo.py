@@ -50,8 +50,6 @@ class SSNE:
     def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
         # Evaluate the parents
         trials = 5
-
-
         for param1, param2 in zip(gene1.actor.parameters(), gene2.actor.parameters()):
             # References to the variable tensors
             W1 = param1.data
@@ -87,24 +85,24 @@ class SSNE:
 
         if self.args.test_ea and self.args._verbose_crossover:
             test_score_p1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_p1 += episode.reward
             test_score_p1 /= trials
 
             test_score_p2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
                 test_score_p2 += episode.reward
             test_score_p2 /= trials
 
             test_score_c1 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c1 += episode.reward
 
             test_score_c2 = 0
-            for eval in range(trials):
+            for _ in range(trials):
                 episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
                 test_score_c2 += episode.reward
             test_score_c2 /= trials
@@ -115,10 +113,8 @@ class SSNE:
             print(f"Parent 2: {test_score_p2:0.1f}")
             print(f"Child1 performance: {test_score_c1:0.2f}")
             print(f"Child2 performance: {test_score_c2:0.2f}")
-            print(f"Benefit1: {test_score_c1 - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
-            print(f"Benefit1: {test_score_c2 - 0.5*(test_score_p1 + test_score_p2) :0.2f}")
-
-
+            print(f"Benefit1: {test_score_c1 - max(test_score_p1,test_score_p2) :0.2f}")
+            print(f"Benefit1: {test_score_c2 - max(test_score_p1,test_score_p2) :0.2f}")
             # self.stats.add({
             #     'cros_parent1_fit': test_score_p1,
             #     'cros_parent2_fit': test_score_p2,
@@ -137,11 +133,12 @@ class SSNE:
         batch_size = min(128, len(new_agent.buffer))
         iters = len(new_agent.buffer) // batch_size
         losses = []
-        for epoch in range(12):
-            for i in range(iters):
+        for _ in range(12):
+            for _ in range(iters):
                 batch = new_agent.buffer.sample(batch_size)
                 losses.append(new_agent.update_parameters(batch, gene1.actor, gene2.actor, self.critic))
-
+        
+        # test and print
         if self.args.test_ea and self.args._verbose_crossover:
             test_score_p1 = 0
             trials = 5
@@ -164,11 +161,11 @@ class SSNE:
 
 
             print("==================== Distillation Crossover ======================")
-            print(f"MSE Loss: {np.mean(losses[-40:]):0.2f}")
+            print(f"MSE Loss: {np.mean(losses[-40:]):0.4f}")
             print(f"Parent 1: {test_score_p1:0.1f}")
             print(f"Parent 2: {test_score_p2:0.1f}")
             print(f"Child performance: {test_score_c:0.2f}")
-            print(f"Benefit: {test_score_c - 0.5*(test_score_p1 + test_score_p2) :0.2f} (>0 is better)")
+            print(f"Benefit: {test_score_c - min(test_score_p1,test_score_p2) :0.2f} (>0 is better)")
             
             # self.stats.add({
             #     'cros_parent1_fit': test_score_p1,
@@ -181,8 +178,6 @@ class SSNE:
     
     def proximal_mutate(self, gene: GeneticAgent, mag):
         # Based on code from https://github.com/uber-research/safemutations 
-        trials = 5
-
         model = gene.actor
 
         # sample mutation batch
@@ -225,6 +220,7 @@ class SSNE:
 
         # test
         if self.args.test_ea and self.args._verbose_mut:
+            trials = 5
             test_score_p = 0
             for _ in range(trials):
                 episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
@@ -273,7 +269,19 @@ class SSNE:
                 else:
                     groups.append((first, second, fitness[first] + fitness[second]))
         return sorted(groups, key=lambda group: group[2], reverse=True)
-    
+
+    @staticmethod
+    def get_novelty(bcs : np.ndarray, first : int, second : int) -> np.float64:
+        return np.linalg.norm(bcs[first,:] - bcs[second,:], axis = -1, ord =2)
+  
+    @staticmethod
+    def sort_groups_by_novelty(genomes, bcs):
+        groups = []
+        for i,first in enumerate(genomes):
+            for  _,second in enumerate(genomes[i+1:]):
+                groups.append((second, first, SSNE.get_novelty(bcs, first, second)))
+        return sorted(groups, key=lambda group: group[2], reverse=True)
+
     @staticmethod
     def get_distance(gene1: GeneticAgent, gene2: GeneticAgent):
         batch_size = min(256, min(len(gene1.buffer), len(gene2.buffer)))
@@ -281,7 +289,16 @@ class SSNE:
         batch_gene2 = gene2.buffer.sample_from_latest(batch_size, 1000)
 
         return gene1.actor.get_novelty(batch_gene2) + gene2.actor.get_novelty(batch_gene1)
-    
+
+    # @staticmethod
+    # def get_novelty(gene1: GeneticAgent, gene2: GeneticAgent):
+    #     """ Average action over a batch """
+    #     batch_size = min(256, min(len(gene1.buffer), len(gene2.buffer)))
+    #     batch_gene1 = gene1.buffer.sample_from_latest(batch_size, 1000)
+    #     batch_gene2 = gene2.buffer.sample_from_latest(batch_size, 1000)
+
+    #     return gene1.actor.get_novelty(batch_gene2) + gene2.actor.get_novelty(batch_gene1)
+
     @staticmethod
     def sort_groups_by_distance(genomes, pop):
         """ Adds all posssible parent-pairs to a group,
@@ -295,17 +312,18 @@ class SSNE:
             list : sorted groups from most different to msot similar
         """        
         groups = []
-
         for i, first in enumerate(genomes):
             for second in genomes[i+1:]:
                 groups.append((second, first, SSNE.get_distance(pop[first], pop[second])))
         return sorted(groups, key=lambda group: group[2], reverse=True)
 
-    def epoch (self, pop: List[GeneticAgent], fitness_evals : np.array or List[float]):
+    def epoch (self, pop: List[GeneticAgent], fitness_evals : np.array or List[float], bcs_evals : np.array = None):
         """ One generation update. Entire epoch is handled with indices; 
             Index ranks  nets by fitness evaluation - 0 is the best after reversing.
         """ 
-        index_rank = np.argsort(fitness_evals)[::-1]
+        # NOTE fitness and bcs arrays remain unsorted
+
+        index_rank = np.argsort(fitness_evals)[::-1]  
         elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard -- first indeces
         # print('Elites:', elitist_index)
 
@@ -346,13 +364,18 @@ class SSNE:
                 sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
             elif 'dist' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
+            elif 'novelty' in self.args.distil_type.lower() and bcs_evals is not None:
+                print('BC distil crossover')
+                sorted_groups = SSNE.sort_groups_by_novelty(new_elitists + offsprings, bcs_evals)
             else:
                 raise NotImplementedError('Unknown distilation type')
-            for i, unselected in enumerate(unselects):
+
+            for i, unselected_actor in enumerate(unselects):
                 first, second, _ = sorted_groups[i % len(sorted_groups)]
                 if fitness_evals[first] < fitness_evals[second]:
                     first, second = second, first
-                self.clone(self.distilation_crossover(pop[first], pop[second]), pop[unselected])
+                offspring = self.distilation_crossover(pop[first], pop[second])
+                self.clone(offspring, pop[unselected_actor])
         else:
             if len(unselects) % 2 != 0:  # Number of unselects left should be even
                 unselects.append(unselects[fastrand.pcg32bounded(len(unselects))])

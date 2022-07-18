@@ -47,24 +47,23 @@ class Parameters:
         else:
             self.frac_frames_train = 1.  # default training 
 
-        self.gamma = 0.99
-        self.lr    = 1e-3
+        self.batch_size = 88
+        self.buffer_size = 232_086         
+        self.lr    = 0.00171
+        self.gamma = 0.9845
+        self.noise_sd = 0.308
+        self.use_done_mask = True
+        self.use_ounoise = cla.use_ounoise
         self.tau   = 0.005   
         self.seed  = cla.seed
-        self.batch_size = 128
-        self.use_done_mask = True
-        self.buffer_size = 200_000         
-        self.noise_sd = 0.2
-        self.use_ounoise = cla.use_ounoise
 
         # hidden layer
         self.num_layers = 3
-        self.hidden_size = 32    # 64 for TD3-only 
+        self.hidden_size = 43   # 64 for TD3-only 
         self.activation_actor   = 'relu'
         self.activation_critic  = 'elu'  
-        self.learn_start = 10_000       # frames accumulated before grad updates            
-        # self.total_steps = self.num_frames
 
+        self.learn_start = 10_000       # frames accumulated before grad updates            
         # Prioritised Experience Replay
         self.per = cla.per
         if self.per:
@@ -101,7 +100,7 @@ class Parameters:
             self.crossover_prob = 0.0
             self.mutation_prob = 0.9
             self.mutation_mag = 0.05    # NOTE CHANGED FROM 0.1
-            self.mutation_batch_size = 256
+            self.mutation_batch_size = self.batch_size
             self.proximal_mut = cla.proximal_mut
             self.distil_crossover = cla.use_distil
             self.distil_type = cla.distil_type
@@ -116,7 +115,7 @@ class Parameters:
         # Save Results
         self.state_dim = None   # To be initialised externally
         self.action_dim = None  # To be initialised externally
-        self.save_foldername = './logs/tmp/'
+        self.save_foldername = './tmp/'
 
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
