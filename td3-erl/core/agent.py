@@ -100,14 +100,18 @@ class Agent:
         agent.actor.eval()
 
         while not done: 
-            # select action
-            action = agent.actor.select_action(np.array(obs))
+            # start with 0 for stability
+            if self.env.t < 0.2:
+                action = np.zeros((self.env.n_actions))
+            else:
+                # select  actor ation
+                action = agent.actor.select_action(np.array(obs))
 
-            # add exploratory noise
-            if is_action_noise:
-                clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
-                                        - self.args.noise_clip, self.args.noise_clip)
-                action = np.clip(action + clipped_noise, -1.0, 1.0)
+                # add exploratory noise
+                if is_action_noise:
+                    clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
+                                            - self.args.noise_clip, self.args.noise_clip)
+                    action = np.clip(action + clipped_noise, -1.0, 1.0)
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
@@ -137,7 +141,7 @@ class Agent:
 
         # Compute BCs:
         actions = np.asarray(action_lst)
-        bcs = np.std(actions, axis = 0)
+        bcs = np.sum(np.abs(actions), axis = 0)
 
         return Episode(reward = np.sum(rewards), bcs = bcs, length = info['t'],\
                        state_history=state_lst, ref_signals = info['ref'], \
@@ -153,16 +157,9 @@ class Agent:
         for target_param, param in zip(rl_net.parameters(), evo_net.parameters()):
             target_param.data.copy_(param.data)
 
-    def get_pop_novelty(self):
-        epochs = self.args.ns_epochs
-        novelties = np.zeros(len(self.pop))
-        for _ in range(epochs):
-            transitions = self.replay_buffer.sample(self.args.batch_size)
-            batch = replay_memory.Transition(*zip(*transitions))
-            # each agent novelty
-            for i, net in enumerate(self.pop):
-                novelties[i] += (net.get_novelty(batch))
-        return novelties / epochs
+
+    def get_pop_novelty(self, bcs : np.array):
+        return np.sum(np.std(bcs, axis = 0))/bcs.shape[1]
 
     def train_rl(self) -> Dict[float, float]:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
@@ -295,3 +292,16 @@ class Agent:
 
         # NOTE might want to save RL state-history for future cheks
         print('> Saved state history in ' + str(filename) + '\n')
+
+
+
+    # def get_pop_novelty(self): OLD
+    #     epochs = self.args.ns_epochs
+    #     novelties = np.zeros(len(self.pop))
+    #     for _ in range(epochs):
+    #         transitions = self.replay_buffer.sample(self.args.batch_size)
+    #         batch = replay_memory.Transition(*zip(*transitions))
+    #         # each agent novelty
+    #         for i, net in enumerate(self.pop):
+    #             novelties[i] += (net.get_novelty(batch))
+    #     return novelties / epochs

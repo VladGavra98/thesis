@@ -48,9 +48,8 @@ class Parameters:
         self.hidden_size = cla.hidden_size    # 64 for TD3-only 
         self.activation_actor   = 'relu'
         self.activation_critic  = 'elu'  
-        self.learn_start = 10_000       # frames accumulated before grad updates            
-        # self.total_steps = self.num_frames
 
+        self.learn_start = 10_000       # frames accumulated before grad updates            
         # Prioritised Experience Replay
         self.per = False
         if self.per:
@@ -75,7 +74,7 @@ class Parameters:
         # Save Results
         self.state_dim = None   # To be initialised externally
         self.action_dim = None  # To be initialised externally
-        self.save_foldername = './logs/tmp/'
+        self.save_foldername = './tmp/'
 
         if not os.path.exists(self.save_foldername):
             os.makedirs(self.save_foldername)
