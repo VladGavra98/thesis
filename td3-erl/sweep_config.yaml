@@ -14,30 +14,52 @@ metric:
   name: rl_reward
 parameters:
   batch_size:
-    distribution: int_uniform
-    max: 256
-    min: 64
+    distribution: categorical
+    values: 
+    - 32
+    - 64
+    - 86
+    - 100
+    - 128
+  actor_activation:
+    distribution: categorical
+    values: 
+    - 'elu'
+    - 'tanh'
+    - 'relu'
   buffer_size:
-    distribution: int_uniform
-    max: 350000
-    min: 100000
+    distribution: categorical
+    values:
+    - 50000
+    - 100000
+    - 150000
+    - 200000
+    - 250000
+    - 300000
   gamma:
-    distribution: uniform
-    max: 0.991
-    min: 0.97
+    distribution: categorical
+    values: 
+    - 0.97
+    - 0.98
+    - 0.99
+
   hidden_size:
-    distribution: int_uniform
-    max: 96
-    min: 16
+    distribution: categorical
+    values:
+    - 12
+    - 24
+    - 32
+    - 50
+    - 72
   lr:
     distribution: uniform
-    max: 0.002
-    min: 0.0004
+    max: 0.0022
+    min: 0.001
   noise_sd:
     distribution: uniform
-    max: 0.4
-    min: 0.15
+    max: 0.35
+    min: 0.2
   num_layers:
     distribution: int_uniform
-    max: 4
+    max: 3
     min: 1

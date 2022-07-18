@@ -26,7 +26,7 @@ parser.add_argument('-frames', help='Number of frames to learn from', default=nu
 parser.add_argument('-pop_size', help='Population size (if 0 than only RL part is learns)', default=10, type=int)
 parser.add_argument('-champion_target', help='Use champion actor as target policy for critic update.', default=False, type=bool)
 parser.add_argument('-seed', help='Random seed to be used',type=int, default=7)
-parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
+parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true', default = True)
 parser.add_argument('-use_ounoise', help='Replace zero-mean Gaussian nosie with time-correletated OU noise', action='store_true')
 parser.add_argument('-render', help='Render gym episodes', action='store_true')
 

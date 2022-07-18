@@ -101,17 +101,14 @@ class Agent:
 
         while not done: 
             # start with 0 for stability
-            if self.env.t < 0.2:
-                action = np.zeros((self.env.n_actions))
-            else:
-                # select  actor ation
-                action = agent.actor.select_action(np.array(obs))
+            # select  actor ation
+            action = agent.actor.select_action(np.array(obs))
 
-                # add exploratory noise
-                if is_action_noise:
-                    clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
-                                            - self.args.noise_clip, self.args.noise_clip)
-                    action = np.clip(action + clipped_noise, -1.0, 1.0)
+            # add exploratory noise
+            if is_action_noise:
+                clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
+                                        - self.args.noise_clip, self.args.noise_clip)
+                action = np.clip(action + clipped_noise, -1.0, 1.0)
 
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
