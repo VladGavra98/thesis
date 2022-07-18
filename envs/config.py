@@ -13,8 +13,8 @@ def select_env (environemnt_name : str):
         return wrapper.env
     
     elif 'ph' in _name.lower():
-        phlab_config = _name.lower().split('_')[-1]
-        return CitationEnv(configuration=phlab_config)
+        phlab_config, phlab_mode = _name.lower().split('_')[-2:]
+        return CitationEnv(configuration=phlab_config, mode= phlab_mode )
 
     else:
         raise ValueError('Unknown environment type')

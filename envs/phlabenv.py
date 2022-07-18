@@ -75,7 +75,7 @@ class CitationEnv(BaseEnv):
     n_actions_full : int = 10
     n_obs_full : int = 12
 
-    def __init__(self, configuration : str = None):
+    def __init__(self, configuration : str = None, mode : str = None):
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1                  # theta
@@ -88,6 +88,10 @@ class CitationEnv(BaseEnv):
             print('Full state control.')
             self.n_actions = 3
             self.obs_idx = range(10)            # all states         
+
+        # use incremental control
+        self.use_incremental = 'incremental' in mode.lower()
+        if self.use_incremental: print('Incremental control.')
 
         self.t = 0
         self.dt = 0.01      # [s]
@@ -112,14 +116,22 @@ class CitationEnv(BaseEnv):
         self.ref: List[signals.BaseSignal] = None
         
         # actuator bounds
-        self.rate_bound = np.deg2rad(25)        #  [deg/s] 
+        if self.use_incremental:
+            self.bound = np.deg2rad(25)        #  [deg/s] 
+        else:
+            self.bound = np.deg2rad(10)
 
         # state bounds
         self.max_theta = np.deg2rad(60.)
         self.max_phi = np.deg2rad(75.)
-
-        # observation space: aircraft state + actuator state + control states (equal to actuator states)
-        self.n_obs : int = len(self.obs_idx) + 2 * self.n_actions 
+        
+        # observation space: 
+        if self.use_incremental:
+            # aircraft state + actuator state + control states error (equal to actuator states)
+            self.n_obs : int = len(self.obs_idx) +  2 * self.n_actions 
+        else:
+            # aircraft state + control states error
+            self.n_obs : int = len(self.obs_idx) +  self.n_actions 
 
         # error
         self.error : np.ndarray = np.zeros((self.n_actions))
@@ -128,7 +140,7 @@ class CitationEnv(BaseEnv):
         if self.n_actions == 1:
             self.cost = 6/np.pi*np.array([1.])  # individual reward scaler [theta]
         else:
-            self.cost = 6/np.pi*np.array([1., 1.,4.])     # scaler [theta, phi, beta]
+            self.cost = 6/np.pi*np.array([1., 1.,1.])     # scaler [theta, phi, beta]
         self.reward_scale = -1/3                          # scaler
         self.cost         = self.cost[:self.n_actions]
         self.max_bound    = np.ones(self.error.shape)     # bounds
@@ -136,8 +148,8 @@ class CitationEnv(BaseEnv):
     @property
     def action_space(self) -> Box:
         return Box(
-            low   = -self.rate_bound * np.ones(self.n_actions),
-            high  =  self.rate_bound * np.ones(self.n_actions),
+            low   = -self.bound * np.ones(self.n_actions),
+            high  =  self.bound * np.ones(self.n_actions),
             dtype =  np.float64,
         )
     @property
@@ -290,7 +302,10 @@ class CitationEnv(BaseEnv):
             action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.incremental_control(action)
+        if self.use_incremental:
+            u = self.incremental_control(action)
+        else:
+            u = action
 
         # citation input 
         _input = self.pad_action(u)
@@ -410,11 +425,12 @@ if __name__=='__main__':
     from tqdm import tqdm
 
     # init env an actor
-    env = config.select_env('phlab_attitude')
+    env = config.select_env('phlab_attitude_incremental')
 
     
-    trials = 1
+    trials = 2
     verbose = True
+    verbose = verbose* trials < 2
 
     fitness_lst =[]
     for _ in tqdm(range(trials)):
