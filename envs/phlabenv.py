@@ -60,11 +60,11 @@ class BaseEnv(gym.Env, ABC):
         Might not be needed always since it depends on the activation of the output layer. 
 
         Args:
-            clipped_action (mp.ndarray): Clipped action vector (deflections outputed by actor)
+            clipped_action (np.ndarray): Clipped action vector (deflections outputed by actor)
 
         Returns:
             np.ndarray: action vector in the physical limits
-        """        
+        """     
         low, high = self.action_space.low, self.action_space.high
         return low + 0.5 * (clipped_action + 1.0) * (high - low)
 
@@ -75,7 +75,7 @@ class CitationEnv(BaseEnv):
     n_actions_full : int = 10
     n_obs_full : int = 12
 
-    def __init__(self, configuration : str = None, mode : str = None):
+    def __init__(self, configuration : str = None, mode : str = ""):
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1                  # theta
@@ -119,7 +119,7 @@ class CitationEnv(BaseEnv):
         if self.use_incremental:
             self.bound = np.deg2rad(25)        #  [deg/s] 
         else:
-            self.bound = np.deg2rad(10)
+            self.bound = np.deg2rad(10)        #  [deg]
 
         # state bounds
         self.max_theta = np.deg2rad(60.)
@@ -280,7 +280,8 @@ class CitationEnv(BaseEnv):
         self.init_ref()
 
         # Build observation
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
+        self.obs = np.hstack((self.error.flatten(), self.x[self.obs_idx]))
+        if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
 
         return self.obs
 
@@ -295,11 +296,8 @@ class CitationEnv(BaseEnv):
         """        
         is_done = False
 
-        # sclae action to actuator rate bounds 
-        if self.t < 0.2:
-            action = np.array([0.,0.,0.])
-        else:
-            action = self.scale_action(action)   # scaled to actuator limits 
+        # scale action to actuator rate bounds 
+        action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
         if self.use_incremental:
@@ -315,8 +313,10 @@ class CitationEnv(BaseEnv):
         reward = self.get_reward()
 
         # Update observation based on perfect observations & actuator state
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
+        self.obs = np.hstack((self.error.flatten(), self.x[self.obs_idx]))
         self.last_u = u
+        if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
+        
 
         # Step time
         self.t  += self.dt
@@ -378,17 +378,17 @@ def evaluate(verbose : bool = False):
         # PID actor:
         action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
 
-
         if action.shape[0] > 1:
             action[-1]*=-1.5  # rudder needs some scaling
         error_dev  = obs[:env.n_actions]
 
-        if verbose:
-            print(f'Action: {action} -> deflection: {env.last_u}')
-            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
-            
         # Simulate one step in environment
         action = np.clip(action,-1,1)
+
+        if verbose:
+            print(f'Action: {np.rad2deg(action)} -> deflection: {np.rad2deg(env.last_u)}')
+            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
+            
         obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
 
@@ -425,12 +425,12 @@ if __name__=='__main__':
     from tqdm import tqdm
 
     # init env an actor
-    env = config.select_env('phlab_attitude_incremental')
+    env = config.select_env('phlab_attitude')
 
     
     trials = 2
-    verbose = True
-    verbose = verbose* trials < 2
+    verbose = False
+
 
     fitness_lst =[]
     for _ in tqdm(range(trials)):

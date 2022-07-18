@@ -13,14 +13,19 @@ def select_env (environemnt_name : str):
         return wrapper.env
     
     elif 'ph' in _name.lower():
-        phlab_config, phlab_mode = _name.lower().split('_')[-2:]
-        return CitationEnv(configuration=phlab_config, mode= phlab_mode )
+        tokens = _name.lower().split('_')
+        if len(tokens) == 3:
+            _, phlab_config, phlab_mode = tokens
+        else:
+            phlab_config = tokens[-1]
+            phlab_mode = ""
+        return CitationEnv(configuration=phlab_config, mode = phlab_mode )
 
     else:
         raise ValueError('Unknown environment type')
 
 if __name__ == '__main__':
 
-    name = 'phlab_symmetric'
+    name = 'phlab_attitude_incremental'
     tokens = name.split('_')
-    print(tokens[-1])
+    print(tokens)
