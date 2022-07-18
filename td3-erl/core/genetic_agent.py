@@ -6,6 +6,7 @@ from core import replay_memory
 from core.mod_utils import is_lnorm_key, LayerNorm, activations
 
 
+
 class GeneticAgent:
     def __init__(self, args: Parameters):
 
@@ -158,3 +159,5 @@ class Actor(nn.Module):
                 continue
             count += param.numel()
         return count
+
+

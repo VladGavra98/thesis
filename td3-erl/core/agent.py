@@ -100,7 +100,7 @@ class Agent:
 
         while not done: 
             # select  actor ation
-            action = agent.actor.select_action(np.array(obs))
+            action = agent.actor.select_action(obs)
 
             # add exploratory noise
             if is_action_noise:

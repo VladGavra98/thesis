@@ -71,6 +71,9 @@ class Parameters:
             self.alpha = 0.7
             self.beta_zero = 0.5
 
+        # CAPS
+        self.use_caps = True
+        
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 3      # minimum for TD3
