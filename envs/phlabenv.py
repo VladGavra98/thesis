@@ -142,7 +142,6 @@ class CitationEnv(BaseEnv):
             self.cost = 6/np.pi*np.array([1.])  # individual reward scaler [theta]
         else:
             self.cost = 6/np.pi*np.array([1., 1.,1.])     # scaler [theta, phi, beta]
-        self.reward_scale = -1/3                          # scaler
         self.cost         = self.cost[:self.n_actions]
         self.max_bound    = np.ones(self.error.shape)     # bounds
 
@@ -244,9 +243,7 @@ class CitationEnv(BaseEnv):
     def get_reward(self) -> float:
         self.calc_error()
         reward_vec = np.abs(np.clip(self.cost * self.error,-self.max_bound, self.max_bound))
-        reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
-
-        return reward
+        return - reward_vec.sum() / self.error.shape[0]
     
     def incremental_control(self, action : np.ndarray) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
@@ -331,12 +328,12 @@ class CitationEnv(BaseEnv):
             or np.abs(self.phi)   > self.max_phi :
 
             is_done = True
-            reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
+            reward -= 1/self.dt * (self.t_max - self.t)  * 2 # negative reward for dying soon
    
         if np.any(np.isnan(self.x)):
             print('NaN encountered: ', self.x)
             is_done = True
-            reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
+            reward -= 1/self.dt * (self.t_max - self.t) * 2 # negative reward for dying soon
         
         # info:
         info = {
@@ -389,13 +386,6 @@ def evaluate(verbose : bool = False):
     x_lst, rewards,u_lst, nz_lst = [], [], [], []
 
     
-    caps_dict = {
-            'lambda_s' : 0.5,
-            'lambda_t' : 0.1,
-            'eps_s'    : 0.05,
-            'actor'    : pid_actor
-                }
-
     while not done:
         u_lst.append(env.last_u)
         x_lst.append(env.x)

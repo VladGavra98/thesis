@@ -35,5 +35,5 @@ a = np.random.randn(10) * SD
 
 
 
-a = np.hstack([a,[0,0.]])
-print(a)
+a = np.array([1,-1,1])
+b = np.array([2,3,4])

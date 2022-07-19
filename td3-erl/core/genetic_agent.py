@@ -77,7 +77,7 @@ class Actor(nn.Module):
 
         # Input Layer 
         layers.extend([
-            nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True),
+            # nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True),
             nn.Linear(args.state_dim, h),
             activation,
         ])

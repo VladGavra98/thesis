@@ -10,7 +10,7 @@ from core.mod_utils import hard_update, soft_update, LayerNorm, activations
 from typing import Tuple, Dict, List
 import logging
 
-MAX_GRAD_NORM = 1
+MAX_GRAD_NORM = 10
 
 
 level = logging.INFO
@@ -60,7 +60,7 @@ class Critic(nn.Module):
     def forward(self, state, action):
         # ------ Critic 1 ---------
         input = torch.cat((state,action), 1)
-        input = self.bnorm_1(input)
+        # input = self.bnorm_1(input)
 
         # hidden layer 1_1 (Input Interface)
         out = self.l1_1(input)
@@ -78,7 +78,7 @@ class Critic(nn.Module):
         # ------ Critic 2 ---------
         # hidden layer 1_2 (Input Interface)
         input = torch.cat((state,action), 1)
-        input = self.bnorm_2(input)
+        # input = self.bnorm_2(input)
 
         out = self.l1_2(input)
         out = self.lnorm1_2(out)
@@ -182,15 +182,15 @@ class TD3(object):
         else:
             pgl = None
             if iteration % self.args.policy_update_freq == 0:
-                soft_update(self.actor_target, self.actor, self.tau)
-                policy_grad_loss = self.actor_update(state_batch, action_batch, next_action_batch)
+                policy_grad_loss = self.actor_update(state_batch, action_batch)
                 # smooth target updates 
+                soft_update(self.actor_target, self.actor, self.tau)
                 soft_update(self.critic_target, self.critic, self.tau)
                 pgl = policy_grad_loss.data.cpu().numpy()
 
         return pgl, TD_data
 
-    def actor_update(self, state_batch, action_batch, next_action_batch):
+    def actor_update(self, state_batch, action_batch):
         self.actor_optim.zero_grad()
 
         # retrieve value of the critics
@@ -198,10 +198,11 @@ class TD3(object):
         policy_grad_loss = -torch.mean(est_q1)                                     # add minus to make it a loss
         
         if self.caps_dict is not None:
-            state_bar = torch.rand_like(state_batch) * self.caps_dict['eps_sd']
+            next_action_batch = self.actor.forward(state_batch)
+            state_bar  = state_batch + torch.rand_like(state_batch) * self.caps_dict['eps_sd']
             action_bar = self.actor.forward(state_bar) 
-            caps_loss = self.caps_dict['lambda_t'] * F.mse_loss(action_batch, next_action_batch) + \
-                        self.caps_dict['lambda_s'] * F.mse_loss(action_batch, action_bar)
+            caps_loss  = self.caps_dict['lambda_t'] * F.mse_loss(action_batch, next_action_batch) + \
+                         self.caps_dict['lambda_s'] * F.mse_loss(action_batch, action_bar)
 
             policy_grad_loss += caps_loss
 
