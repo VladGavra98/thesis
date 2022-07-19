@@ -27,7 +27,7 @@ savefig = True
 
 # Load state history data:
 # logfolder = Path('/home/vlad/Documents/thesis/logs/wandb/run-20220706_104451-2qf6jy26/files/')
-logfolder = Path('./logs/wandb/run-20220717_213834-nbmdpqgz')
+logfolder = Path('./logs/wandb/latest-run')
 logfolder = logfolder / Path('files/')
 
 def plot_epiosde_lon(flst, ep_num_lst, idx, name : str = None):
@@ -46,7 +46,7 @@ def plot_epiosde_lon(flst, ep_num_lst, idx, name : str = None):
     print(name + ' validation fitness: ' , sum(rewards))
 
     fig, axs = plt.subplots(3,2)
-    fig.suptitle(name + f' actor: episdoe {ep_num_lst[idx]}')
+    fig.suptitle(name + f' actor: episode {ep_num_lst[idx]}')
 
     axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$')
     axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$')
@@ -92,7 +92,7 @@ def plot_epiosde_full (flst, ep_num_lst, idx, name : str = None):
     print(name + ' validation fitness: ' , sum(rewards))
 
     fig, axs = plt.subplots(4,2)
-    fig.suptitle(name + f' actor: episdoe {ep_num_lst[idx]}')
+    fig.suptitle(name + f' actor: episode {ep_num_lst[idx]}')
 
     axs[0,0].plot(time,np.rad2deg(x_lst[:,1]), label = r'$q$', linestyle = ':', color = colors[4])
     axs[0,0].plot(time,np.rad2deg(x_lst[:,7]), label = r'$\theta$', color = colors[1])
@@ -117,11 +117,11 @@ def plot_epiosde_full (flst, ep_num_lst, idx, name : str = None):
     axs[3,0].set_ylabel(r'$H~[m]$')
 
     # plot actions
-    axs[0,1].plot(time,100*np.rad2deg(u_lst[:,0]), linestyle = '-')
+    axs[0,1].plot(time,np.rad2deg(u_lst[:,0]), linestyle = '-')
     axs[0,1].set_ylabel(r'$\delta_e~[deg]$')
-    axs[1,1].plot(time,100*np.rad2deg(u_lst[:,1]), linestyle = '-')
+    axs[1,1].plot(time,np.rad2deg(u_lst[:,1]), linestyle = '-')
     axs[1,1].set_ylabel(r'$\delta_a~[deg]$')
-    axs[2,1].plot(time,100*np.rad2deg(u_lst[:,2]), linestyle = '-')
+    axs[2,1].plot(time,np.rad2deg(u_lst[:,2]), linestyle = '-')
     axs[2,1].set_ylabel(r'$\delta_r~[deg]$')
 
     # axs[3,1].plot(time,nz_lst[:], linestyle = '--',label = 'nz')
@@ -157,6 +157,7 @@ if __name__ == '__main__':
     # full attitude control episodes
     if len(flst):
         plot_epiosde_full(flst, ep_num_lst, idx, name = 'Champion')
+
     plot_epiosde_full(rl_flst, rl_ep_num_lst, idx, name = 'RL')
 
 

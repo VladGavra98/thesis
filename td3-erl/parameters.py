@@ -33,6 +33,7 @@ class Parameters:
         self.test_ea = False
         self.frac_frames_train = 1.  # default training 
 
+
         self.gamma = cla.gamma
         self.lr    = cla.lr
         self.tau   = 0.005   
@@ -44,6 +45,7 @@ class Parameters:
         self.use_ounoise = False
 
         # hidden layer
+
         self.num_layers = cla.num_layers
         self.hidden_size = cla.hidden_size    # 64 for TD3-only 
         self.activation_actor   = 'relu'
@@ -57,6 +59,9 @@ class Parameters:
             self.alpha = 0.7
             self.beta_zero = 0.5
 
+        # CAPS
+        self.use_caps = cla.use_caps
+        
         # ==================================    TD3 Params  =============================================
  
         self.policy_update_freq = 3      # minimum for TD3
