@@ -49,9 +49,9 @@ class Parameters:
 
         self.batch_size = 64
         self.buffer_size = 50_000        
-        self.lr    = 0.00171
+        self.lr    = 0.001
         self.gamma = 0.98
-        self.noise_sd = 0.308
+        self.noise_sd = 0.3
         self.use_done_mask = True
         self.use_ounoise = cla.use_ounoise
         self.tau   = 0.005   

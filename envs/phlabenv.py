@@ -443,7 +443,7 @@ if __name__=='__main__':
     # init env an actor
     env = config.select_env('phlab_attitude')
 
-    trials = 2
+    trials = 20
     verbose = False
     fitness_lst =[]
 
