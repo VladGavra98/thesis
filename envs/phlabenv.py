@@ -290,7 +290,7 @@ class CitationEnv(BaseEnv):
 
         return self.obs
 
-    def step (self, action: np.ndarray, caps_args : dict = None) -> Tuple[np.ndarray, float, bool, dict]:
+    def step (self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         """ Gym-like step function returns: (state, reward, done, info) 
 
         Args:
@@ -316,17 +316,12 @@ class CitationEnv(BaseEnv):
         
         # Reward using clipped error
         reward = self.get_reward()
-
              
         # Update observation based on perfect observations & actuator state
         self.obs = np.hstack((self.error.flatten(), self.x[self.obs_idx]))
         self.last_u = u
         if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
         
-        # if caps_args is not None:
-        #     reward -= caps_args['lambda_t'] * self. calc_time_diff(action, self.last_u[:self.n_actions]) + \
-        #               caps_args['lambda_s'] * self.calc_space_diff(action, self.last_obs, caps_args['actor'])
-
         # Step time
         self.t  += self.dt
         self.last_obs = self.obs
@@ -355,18 +350,6 @@ class CitationEnv(BaseEnv):
         """ just to make the linter happy (we are deriving from gym.Env)"""
         pass
     
-    @staticmethod
-    def calc_time_diff(cur_action : np.ndarray, prev_action : np.ndarray) ->np.float64:
-        return np.linalg.norm(cur_action - prev_action)
-
-    @staticmethod
-    def calc_space_diff(cur_action : np.ndarray, cur_state : np.ndarray, actor : object) ->np.float64:
-        SD =0.05
-        state_  = cur_state  + np.random.rand(cur_state.shape[0]) * SD 
-        
-        action_ = actor.select_action(state_)
-        return np.linalg.norm(cur_action - action_) 
-
     @staticmethod
     def finish():
         """ Terminate the simulink thing."""
@@ -399,8 +382,8 @@ def evaluate(verbose : bool = False):
     obs = env.reset()
 
     # PID actor
-    p, i, d = 6., 6.,5.    # gains
-    pid_actor = PID (p,i,d, dt = env.dt)
+    p, i, d = 6., 6., 5.            # gains
+    pid_actor = PID(p, i, d, dt = env.dt)
     
     ref_beta, ref_theta, ref_phi = [], [], []
     x_lst, rewards,u_lst, nz_lst = [], [], [], []
@@ -430,8 +413,9 @@ def evaluate(verbose : bool = False):
         if verbose:
             print(f'Action: {np.rad2deg(action)} -> deflection: {np.rad2deg(env.last_u)}')
             print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
-            
-        obs, reward, done, info = env.step(action.flatten(), caps_args= caps_dict)
+            print(np.rad2deg(env.obs))
+
+        obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
 
         if verbose:
@@ -445,7 +429,6 @@ def evaluate(verbose : bool = False):
         # Update
         pid_actor.update(obs[:env.n_actions], next_obs[:env.n_actions] )
         obs = next_obs
-
 
         # save 
         rewards.append(reward)
@@ -470,7 +453,7 @@ if __name__=='__main__':
     env = config.select_env('phlab_attitude')
 
     trials = 2
-    verbose = False
+    verbose = True
     fitness_lst =[]
 
     for _ in tqdm(range(trials)):
