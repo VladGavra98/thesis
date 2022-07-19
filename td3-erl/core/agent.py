@@ -10,12 +10,13 @@ from typing import List, Dict, Tuple
 from tqdm import tqdm
 import os
 
+
 @dataclass                                                                                                                                      
 class Episode: 
     """ Output of one episode. 
     """                                                                                                                     
-    reward        : np.float64                                                                                                                             
-    bcs           : Tuple[np.float64]                                                                                                                           
+    bcs : Tuple[np.float64]                                                                                                                           
+    reward : float                                                                                                                         
     length        : np.float64 
     state_history : List
     ref_signals   : List
@@ -102,6 +103,7 @@ class Agent:
             # select  actor ation
             action = agent.actor.select_action(obs)
 
+
             # add exploratory noise
             if is_action_noise:
                 clipped_noise = np.clip(self.args.noise_sd * np.random.randn(action.shape[0]),\
@@ -160,10 +162,11 @@ class Agent:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
             The frames are sampled from the common buffer.
         """
-        print('Train RL agent ...')
+        
         pgs_obj, TD_loss = [],[]
 
         if len(self.replay_buffer) > self.args.learn_start: 
+            print('Train RL agent ...')
             # prepare for training
             self.rl_agent.actor.train()
 
@@ -214,47 +217,23 @@ class Agent:
         self.gen_frames = 0
         self.iterations += 1
         
-        best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
-        test_score = 1; test_sd = -1; 
-        pop_novelty = -1
+
         lengths = []
-
-        '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
-        if len(self.pop):
-            rewards = np.zeros((self.args.num_evals, self.args.pop_size))
-            bcs = np.zeros((self.args.num_evals, self.args.pop_size,3))
-
-            # Evaluate genomes/individuals
-            # >>> loop over population AND store experiences
-            for j,net in enumerate(self.pop):   
-                for i in range(self.args.num_evals):
-                    episode = self.evaluate(net, is_action_noise = False,\
-                                                store_transition = True)
-                    rewards[i,j] = episode.reward
-                    bcs[i,j,:] = episode.bcs
-                    lengths.append(episode.length)
-
-            # take average stats
-            rewards = np.mean(rewards, axis = 0) 
-            bcs     = np.mean(bcs, axis = 0)
-            ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
-
-            # get popualtion stats
-            best_train_fitness  = np.max(rewards)              # champion - highest reward
-            worst_train_fitness = np.min(rewards)
-            population_avg      = np.average(rewards)          # population_avg 
-            self.champion       = self.pop[np.argmax(rewards)]
-            self.champion_actor  = self.champion.actor         # unpack for RL critic updates 
-
-            # Validation test for NeuroEvolution 
-            test_score, test_sd, _, _, last_episode = self.validate_agent(self.champion)
-            self.champion_history = self.get_history(last_episode)
-
-            # NeuroEvolution's probabilistic selection and recombination step
-            elite_index = self.evolver.epoch(self.pop, rewards, bcs)
-
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
+        rl_extra_evals = 5
+        rewards = np.zeros((rl_extra_evals))
+        bcs     = np.zeros((rl_extra_evals,3))
+
+        print('Info: playing extra episodes with action nosie for RL training')
+        for i in range(rl_extra_evals):
+            episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
+            lengths.append(episode.length)
+            rewards[i] = episode.reward
+            bcs[i,:] = episode.bcs
+
+        print(f'RL training reward: {np.average(rewards):0.1f}')
+        ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
@@ -269,36 +248,15 @@ class Agent:
             ep_len_sd = rl_ep_std
         self.rl_history = self.get_history(rl_episode)
 
-        ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''
-        if self.iterations % self.args.rl_to_ea_synch_period == 0 and self.args.pop_size:
-            # Replace any index different from the new elite
-            replace_index = np.argmin(rewards)
 
-            if replace_index == elite_index:
-                replace_index = (replace_index + 1) % len(self.pop)
-
-            self.rl_to_evo(self.rl_agent, self.pop[replace_index])
-            self.evolver.rl_policy = replace_index
-            print('Sync from RL --> Evolution')
-
-        # # Get popualtion novelty:
-        if self.args.pop_size:
-            pop_novelty = self.get_pop_novelty(bcs)
         # -------------------------- Collect statistics --------------------------
         return {
-            'best_train_fitness': best_train_fitness,
-            'test_score':  test_score,
-            'test_sd':     test_sd,
-            'pop_avg':     population_avg,
-            'pop_min':     worst_train_fitness,
-            'elite_index': elite_index,
             'rl_reward':   rl_reward,
             'rl_std':      rl_std,
             'avg_ep_len':  ep_len_avg, 
             'ep_len_sd':   ep_len_sd, 
             'PG_obj':      rl_train_scores['PG_obj'],
             'TD_loss':     rl_train_scores['TD_loss'],
-            'pop_novelty': pop_novelty,
         }
 
 
