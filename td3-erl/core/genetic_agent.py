@@ -3,7 +3,8 @@ import torch.nn as nn
 from torch.optim import Adam
 from parameters import Parameters
 from core import replay_memory
-from core.mod_utils import is_lnorm_key, LayerNorm
+from core.mod_utils import is_lnorm_key, LayerNorm, activations
+
 
 
 class GeneticAgent:
@@ -36,7 +37,6 @@ class GeneticAgent:
         p2_action = p2(state_batch)
 
         #  Redeem parents' Qs
-
         if self.args.use_ddpg:
             p1_q = critic(state_batch, p1_action).flatten()
             p2_q = critic(state_batch, p2_action).flatten()
@@ -47,7 +47,7 @@ class GeneticAgent:
             p2_q = torch.min(p2_q1,p2_q2).flatten()
 
         #  Select best behaving pparent based on Q-filtering:
-        eps = 0.0  # selection threshold -- how much better one action is wrt the other
+        eps = 10**-5  # selection threshold -- how much better one action is wrt the other
         action_batch = torch.cat((p1_action[p1_q - p2_q > eps], p2_action[p2_q - p1_q >= eps])).detach()
         state_batch  = torch.cat((state_batch[p1_q - p2_q > eps], state_batch[p2_q - p1_q >= eps]))
         actor_action = self.actor(state_batch)
@@ -63,60 +63,46 @@ class GeneticAgent:
         return policy_mse.item()
 
 
+
 class Actor(nn.Module):
 
     def __init__(self, args, init=False):
         super(Actor, self).__init__()
         self.args = args
-        h1,h2,h3  = args.hidden_sizes
+        h = args.hidden_size
+        L = args.num_layers
+        activation = activations[args.activation_actor.lower()]
+
+        layers = []
 
         # Input Layer 
-        self.bnorm = nn.BatchNorm1d(args.state_dim)  # batch norm
-        self.w_l1 = nn.Linear(args.state_dim, h1)
-        self.lnorm1 = LayerNorm(h1)
+        layers.extend([
+            # nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True),
+            nn.Linear(args.state_dim, h),
+            activation,
+        ])
+        
+        # Hidden Layers
+        for _ in range(L):
+            layers.extend([
+                nn.Linear(h, h),
+                LayerNorm(h),
+                activation
+            ])
 
-        # Hidden Layer 1
-        self.w_l2 = nn.Linear(h1, h2)
-        self.lnorm2 = LayerNorm(h2)
+        # Output Layer 
+        layers.extend([
+            nn.Linear(h, args.action_dim),
+            nn.Tanh(),
+        ])
+            
+        self.net = nn.Sequential(*layers)
+        self.to(args.device)
 
-        # Hidden Layer 2
-        self.w_l3 = nn.Linear(h2, h3)
-        self.lnorm3 = LayerNorm(h3)
+    def forward(self, state : torch.tensor) -> torch.tensor:
+        return self.net(state)
 
-        # Out
-        self.w_out = nn.Linear(h3, args.action_dim)
-
-        # # Init
-        # if init:
-        #     self.w_out.weight.data.mul_(0.1)
-        #     self.w_out.bias.data.mul_(0.1)
-        #     self.novelty = 0.
-
-        self.to(self.args.device)
-
-    def forward(self, input):
-
-        # Hidden Layer 1
-        # input = self.bnorm(input)
-        out = self.w_l1(input)
-        out = self.lnorm1(out)
-        out = out.relu()
-
-        # Hidden Layer 2
-        out = self.w_l2(out)
-        out = self.lnorm2(out)
-        out = out.relu()
-
-        # Hidden Layer 2
-        out = self.w_l3(out)
-        out = self.lnorm3(out)
-        out = out.relu()
-
-        # output layer
-        out = (self.w_out(out)).tanh()
-        return out
-
-    def select_action(self, state):
+    def select_action(self, state : torch.tensor):
         state = torch.FloatTensor(state.reshape(1, -1)).to(self.args.device)
         return self.forward(state).cpu().data.numpy().flatten()
 
@@ -156,6 +142,7 @@ class Actor(nn.Module):
     def inject_parameters(self, pvec):
         count = 0
         for name, param in self.named_parameters():
+            # only alter W -- skip norms and biases
             if is_lnorm_key(name) or len(param.shape) != 2:
                 continue
             sz = param.numel()
@@ -172,3 +159,5 @@ class Actor(nn.Module):
                 continue
             count += param.numel()
         return count
+
+

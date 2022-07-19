@@ -19,14 +19,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-should_log', help='Wether the WandB loggers are used', action='store_true')
 parser.add_argument('-run_name', default='test', type=str)
 parser.add_argument('-env', help='Environment Choices: (LunarLanderContinuous-v2) (PHLab)',type=str, default='PHlab_attitude')
-parser.add_argument('-use_ddpg', help='Wether to use DDPG in place of TD3 for the RL part.',action='store_true')
 parser.add_argument('-frames', help='Number of frames to learn from', default=num_frames, type=int)
 
+parser.add_argument('-pop_size', help='Population size (if 0 than only RL part is learns)', default=10, type=int)
+parser.add_argument('-champion_target', help='Use champion actor as target policy for critic update.', default=False, type=bool)
 parser.add_argument('-seed', help='Random seed to be used',type=int, default=7)
-parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true')
+parser.add_argument('-disable_cuda', help='Disables CUDA', action='store_true', default = True)
 parser.add_argument('-use_ounoise', help='Replace zero-mean Gaussian nosie with time-correletated OU noise', action='store_true')
-parser.add_argument('-render', help='Render gym episodes', action='store_true')
-
+parser.add_argument('-use_caps', help='Use CPAS loss regularisation for smooth actions.', action='store_true', default=False)
 
 
 parser.add_argument('-novelty', help='Use novelty exploration', action='store_true')
@@ -35,12 +35,14 @@ parser.add_argument('-use_distil', help='Use distilation crossover', action='sto
 parser.add_argument('-distil_type', help='Use distilation crossover. Choices: (fitness) (distance)',
                     type=str, default='distance')
                     
-parser.add_argument('-per', help='Use Prioritised Experience Replay', action='store_true')
+parser.add_argument('-test_ea', help='Test the EA loop and deactivate RL.', default= False, action='store_true')
 parser.add_argument('-verbose_mut', help='Make mutations verbose', action='store_true')
 parser.add_argument('-verbose_crossover',help='Make crossovers verbose', action='store_true')
+parser.add_argument('-use_ddpg', help='Wether to use DDPG in place of TD3 for the RL part.',action='store_true')
 parser.add_argument('-opstat', help='Store statistics for the variation operators', action='store_true')
 parser.add_argument('-test_operators', help='Test the variational operators', action='store_true')
 
+parser.add_argument('-per', help='Use Prioritised Experience Replay', action='store_true')
 parser.add_argument('-sync_period', help="How often to sync to population", type=int)
 parser.add_argument('-save_periodic', help='Save actor, critic and memory periodically', action='store_true')
 parser.add_argument('-next_save', help='Generation save frequency for save_periodic',
@@ -103,6 +105,7 @@ if __name__ == "__main__":
               ' Test SD:', '%.2f' % stats['test_sd'] if stats['test_sd'] is not None else None,
               ' Population Avg:', '%.2f' % stats['pop_avg'],
               ' Weakest :', '%.2f' % stats['pop_min'],
+              ' Novelty :', '%.2f' % stats['pop_novelty'],
               '\n',
               ' Avg. ep. len:', '%.2fs' % stats['avg_ep_len'],
               ' RL Reward:', '%.2f' % stats['rl_reward'],

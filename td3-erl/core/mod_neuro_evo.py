@@ -18,8 +18,11 @@ class SSNE:
         self.population_size = self.args.pop_size
         self.num_elitists = max(int(self.args.elite_fraction * args.pop_size),1)
         self.evaluate = evaluate
+
+        # testing stats
         self.stats = PopulationStats(self.args)
-        
+        self.mut_change = 0.0
+
         self.rl_policy = None
         self.selection_stats = {'elite': 0, 'selected': 0, 'discarded':0, 'total':0.0000001}
 
@@ -47,19 +50,6 @@ class SSNE:
     def crossover_inplace(self, gene1: GeneticAgent, gene2: GeneticAgent):
         # Evaluate the parents
         trials = 5
-        if self.args.opstat and self.stats.should_log():
-            test_score_p1 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode['reward']
-            test_score_p1 /= trials
-
-            test_score_p2 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode['reward']
-            test_score_p2 /= trials
-
         for param1, param2 in zip(gene1.actor.parameters(), gene2.actor.parameters()):
             # References to the variable tensors
             W1 = param1.data
@@ -92,33 +82,47 @@ class SSNE:
                         W2[ind_cr] = W1[ind_cr]
 
         # Evaluate the children
-        if self.args.opstat and self.stats.should_log():
+
+        if self.args.test_ea and self.args._verbose_crossover:
+            test_score_p1 = 0
+            for _ in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_p1 += episode.reward
+            test_score_p1 /= trials
+
+            test_score_p2 = 0
+            for _ in range(trials):
+                episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
+                test_score_p2 += episode.reward
+            test_score_p2 /= trials
+
             test_score_c1 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c1 += episode['reward']
-            test_score_c1 /= trials
+            for _ in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_c1 += episode.reward
 
             test_score_c2 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c2 += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_c2 += episode.reward
             test_score_c2 /= trials
 
-            if self.args.verbose_crossover:
-                print("==================== Classic Crossover ======================")
-                print("Parent 1", test_score_p1)
-                print("Parent 2", test_score_p2)
-                print("Child 1", test_score_c1)
-                print("Child 2", test_score_c2)
+  
+            print("==================== Classic Crossover ======================")
+            print(f"Parent 1: {test_score_p1:0.1f}")
+            print(f"Parent 2: {test_score_p2:0.1f}")
+            print(f"Child1 performance: {test_score_c1:0.2f}")
+            print(f"Child2 performance: {test_score_c2:0.2f}")
+            print(f"Benefit1: {test_score_c1 - max(test_score_p1,test_score_p2) :0.2f}")
+            print(f"Benefit1: {test_score_c2 - max(test_score_p1,test_score_p2) :0.2f}")
+            # self.stats.add({
+            #     'cros_parent1_fit': test_score_p1,
+            #     'cros_parent2_fit': test_score_p2,
+            #     'cros_child_fit': np.mean([test_score_c1, test_score_c2]),
+            #     'cros_child1_fit': test_score_c1,
+            #     'cros_child2_fit': test_score_c2,
+            # })
 
-            self.stats.add({
-                'cros_parent1_fit': test_score_p1,
-                'cros_parent2_fit': test_score_p2,
-                'cros_child_fit': np.mean([test_score_c1, test_score_c2]),
-                'cros_child1_fit': test_score_c1,
-                'cros_child2_fit': test_score_c2,
-            })
     def distilation_crossover(self, gene1: GeneticAgent, gene2: GeneticAgent) -> GeneticAgent:
         new_agent = GeneticAgent(self.args)
         new_agent.buffer.add_latest_from(gene1.buffer, self.args.individual_bs // 2)
@@ -129,59 +133,54 @@ class SSNE:
         batch_size = min(128, len(new_agent.buffer))
         iters = len(new_agent.buffer) // batch_size
         losses = []
-        for epoch in range(12):
-            for i in range(iters):
+        for _ in range(12):
+            for _ in range(iters):
                 batch = new_agent.buffer.sample(batch_size)
                 losses.append(new_agent.update_parameters(batch, gene1.actor, gene2.actor, self.critic))
-
-        if self.args.opstat and self.stats.should_log():
+        
+        # test and print
+        if self.args.test_ea and self.args._verbose_crossover:
             test_score_p1 = 0
             trials = 5
-            for eval in range(trials):
-                episode = self.evaluate(gene1, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p1 += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene1, is_action_noise=False, store_transition=False)
+                test_score_p1 += episode.reward
             test_score_p1 /= trials
 
             test_score_p2 = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene2, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p2 += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene2, is_action_noise=False, store_transition=False)
+                test_score_p2 += episode.reward
             test_score_p2 /= trials
 
             test_score_c = 0
-            for eval in range(trials):
-                episode = self.evaluate(new_agent, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(new_agent,  is_action_noise=False, store_transition=False)
+                test_score_c += episode.reward
             test_score_c /= trials
 
-            if self.args.verbose_crossover:
-                print("==================== Distillation Crossover ======================")
-                print("MSE Loss:", np.mean(losses[-40:]))
-                print("Parent 1", test_score_p1)
-                print("Parent 2", test_score_p2)
-                print("Crossover performance: ", test_score_c)
 
-            self.stats.add({
-                'cros_parent1_fit': test_score_p1,
-                'cros_parent2_fit': test_score_p2,
-                'cros_child_fit': test_score_c,
-            })
+            print("==================== Distillation Crossover ======================")
+            print(f"MSE Loss: {np.mean(losses[-40:]):0.4f}")
+            print(f"Parent 1: {test_score_p1:0.1f}")
+            print(f"Parent 2: {test_score_p2:0.1f}")
+            print(f"Child performance: {test_score_c:0.2f}")
+            print(f"Benefit: {test_score_c - min(test_score_p1,test_score_p2) :0.2f} (>0 is better)")
+            
+            # self.stats.add({
+            #     'cros_parent1_fit': test_score_p1,
+            #     'cros_parent2_fit': test_score_p2,
+            #     'cros_child_fit': test_score_c,
+            # })
 
         return new_agent
 
     
     def proximal_mutate(self, gene: GeneticAgent, mag):
         # Based on code from https://github.com/uber-research/safemutations 
-        trials = 5
-        if self.stats.should_log():
-            test_score_p = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_p += episode['reward']
-            test_score_p /= trials
-
         model = gene.actor
 
+        # sample mutation batch
         batch = gene.buffer.sample(min(self.args.mutation_batch_size, len(gene.buffer)))
         state, _, _, _, _ = batch
         output = model(state)
@@ -190,13 +189,12 @@ class SSNE:
         tot_size = model.count_parameters()
         num_outputs = output.size()[1]
 
-
         # initial perturbation
         normal = dist.Normal(torch.zeros_like(params), torch.ones_like(params) * mag)
         delta = normal.sample()
 
-
-        # we want to calculate a jacobian of derivatives of each output's sensitivity to each parameter
+        # we want to calculate a jacobian of derivatives 
+        # of each output's sensitivity to each parameter
         jacobian = torch.zeros(num_outputs, tot_size).to(self.args.device)
         grad_output = torch.zeros(output.size()).to(self.args.device)
 
@@ -211,30 +209,43 @@ class SSNE:
 
         # summed gradients sensitivity
         scaling = torch.sqrt((jacobian**2).sum(0))
+        
         scaling[scaling == 0] = 1.0
         scaling[scaling < 0.01] = 0.01
         delta /= scaling
-        new_params = params + delta
 
+        #update child actor net
+        new_params = params + delta   
         model.inject_parameters(new_params)
 
-        if self.stats.should_log():
+        # test
+        if self.args.test_ea and self.args._verbose_mut:
+            trials = 5
+            test_score_p = 0
+            for _ in range(trials):
+                episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
+                test_score_p += episode.reward
+            test_score_p /= trials
+
             test_score_c = 0
-            for eval in range(trials):
-                episode = self.evaluate(gene, is_render=False, is_action_noise=False, store_transition=False)
-                test_score_c += episode['reward']
+            for _ in range(trials):
+                episode = self.evaluate(gene, is_action_noise=False, store_transition=False)
+                test_score_c += episode.reward
             test_score_c /= trials
 
             self.stats.add({
                 'mut_parent_fit': test_score_p,
                 'mut_child_fit': test_score_c,
             })
-
-            if self.args.verbose_mutation:
-                print("==================== Mutation ======================")
-                print("Fitness before: ", test_score_p)
-                print("Fitness after: ", test_score_c)
-                print("Mean mutation change:", torch.mean(torch.abs(new_params - params)).item())
+            self.mut_change = 0.1*self.mut_change + 0.9*(test_score_c - test_score_p)/(-test_score_p)*100
+            print("==================== Mutation ======================")
+            print(f"Parent: {test_score_p:0.1f}")
+            print(f"Child: {test_score_c:0.1f}")
+            print(f'Delta: {torch.mean(delta).item()}')
+            print(f'Average mutation change: {self.mut_change:0.2f} %')
+            print(f"Mean mutation change: from {torch.mean(torch.abs(params)).item():0.3f} /\
+                to {torch.mean(torch.abs(new_params)).item():0.3f} /\
+                by {torch.mean(torch.abs(new_params - params)).item():0.3f}")
 
     def clone(self, master: GeneticAgent, replacee: GeneticAgent):  # Replace the replacee individual with master
         """ Copy weights from master to replacee.
@@ -258,7 +269,19 @@ class SSNE:
                 else:
                     groups.append((first, second, fitness[first] + fitness[second]))
         return sorted(groups, key=lambda group: group[2], reverse=True)
-    
+
+    @staticmethod
+    def get_novelty(bcs : np.ndarray, first : int, second : int) -> np.float64:
+        return np.linalg.norm(bcs[first,:] - bcs[second,:], axis = -1, ord =2)
+  
+    @staticmethod
+    def sort_groups_by_novelty(genomes, bcs):
+        groups = []
+        for i,first in enumerate(genomes):
+            for  _,second in enumerate(genomes[i+1:]):
+                groups.append((second, first, SSNE.get_novelty(bcs, first, second)))
+        return sorted(groups, key=lambda group: group[2], reverse=True)
+
     @staticmethod
     def get_distance(gene1: GeneticAgent, gene2: GeneticAgent):
         batch_size = min(256, min(len(gene1.buffer), len(gene2.buffer)))
@@ -266,7 +289,16 @@ class SSNE:
         batch_gene2 = gene2.buffer.sample_from_latest(batch_size, 1000)
 
         return gene1.actor.get_novelty(batch_gene2) + gene2.actor.get_novelty(batch_gene1)
-    
+
+    # @staticmethod
+    # def get_novelty(gene1: GeneticAgent, gene2: GeneticAgent):
+    #     """ Average action over a batch """
+    #     batch_size = min(256, min(len(gene1.buffer), len(gene2.buffer)))
+    #     batch_gene1 = gene1.buffer.sample_from_latest(batch_size, 1000)
+    #     batch_gene2 = gene2.buffer.sample_from_latest(batch_size, 1000)
+
+    #     return gene1.actor.get_novelty(batch_gene2) + gene2.actor.get_novelty(batch_gene1)
+
     @staticmethod
     def sort_groups_by_distance(genomes, pop):
         """ Adds all posssible parent-pairs to a group,
@@ -280,17 +312,18 @@ class SSNE:
             list : sorted groups from most different to msot similar
         """        
         groups = []
-
         for i, first in enumerate(genomes):
             for second in genomes[i+1:]:
                 groups.append((second, first, SSNE.get_distance(pop[first], pop[second])))
         return sorted(groups, key=lambda group: group[2], reverse=True)
 
-    def epoch (self, pop: List[GeneticAgent], fitness_evals : np.array or List[float]):
+    def epoch (self, pop: List[GeneticAgent], fitness_evals : np.array or List[float], bcs_evals : np.array = None):
         """ One generation update. Entire epoch is handled with indices; 
             Index ranks  nets by fitness evaluation - 0 is the best after reversing.
         """ 
-        index_rank = np.argsort(fitness_evals)[::-1]
+        # NOTE fitness and bcs arrays remain unsorted
+
+        index_rank = np.argsort(fitness_evals)[::-1]  
         elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard -- first indeces
         # print('Elites:', elitist_index)
 
@@ -331,13 +364,18 @@ class SSNE:
                 sorted_groups = SSNE.sort_groups_by_fitness(new_elitists + offsprings, fitness_evals)
             elif 'dist' in self.args.distil_type.lower():
                 sorted_groups = SSNE.sort_groups_by_distance(new_elitists + offsprings, pop)
+            elif 'novelty' in self.args.distil_type.lower() and bcs_evals is not None:
+                print('BC distil crossover')
+                sorted_groups = SSNE.sort_groups_by_novelty(new_elitists + offsprings, bcs_evals)
             else:
                 raise NotImplementedError('Unknown distilation type')
-            for i, unselected in enumerate(unselects):
+
+            for i, unselected_actor in enumerate(unselects):
                 first, second, _ = sorted_groups[i % len(sorted_groups)]
                 if fitness_evals[first] < fitness_evals[second]:
                     first, second = second, first
-                self.clone(self.distilation_crossover(pop[first], pop[second]), pop[unselected])
+                offspring = self.distilation_crossover(pop[first], pop[second])
+                self.clone(offspring, pop[unselected_actor])
         else:
             if len(unselects) % 2 != 0:  # Number of unselects left should be even
                 unselects.append(unselects[fastrand.pcg32bounded(len(unselects))])
@@ -364,9 +402,8 @@ class SSNE:
                 # print(f'actor {i} mutated - fitness: {fitness_evals[i]}')
                 self.proximal_mutate(pop[i], mag=self.args.mutation_mag)
 
-
-        if self.stats.should_log():
-            self.stats.log()
+        # if self.stats.should_log():
+        #     self.stats.log()
         self.stats.reset()
 
         return new_elitists[0]

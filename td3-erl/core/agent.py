@@ -10,12 +10,13 @@ from typing import List, Dict, Tuple
 from tqdm import tqdm
 import os
 
+
 @dataclass                                                                                                                                      
 class Episode: 
     """ Output of one episode. 
     """                                                                                                                     
-    reward        : np.float64                                                                                                                             
-    bcs           : Tuple[np.float64]                                                                                                                           
+    bcs : Tuple[np.float64]                                                                                                                           
+    reward : float                                                                                                                         
     length        : np.float64 
     state_history : List
     ref_signals   : List
@@ -80,24 +81,28 @@ class Agent:
                   agent: genetic_agent.GeneticAgent or ddpg.DDPG or td3.TD3, 
                   is_action_noise : bool,
                   store_transition : bool) -> Episode:
-        """ Play one game to evaualute the agent.
+        """ Play one game to evaluate the agent.
 
         Args:
             agent (GeneticAgentor): Agent class. 
-            is_action_noise (bool): Add OU noise to action.
+            is_action_noise (bool): Add Gaussian/OU noise to action.
             store_transition (bool, optional): Add frames to memory buffer for training. Defaults to True.
 
         Returns:
             Episode: data class with the episode stats
         """
-        # init states and env
+        # init states, env and 
         rewards, state_lst, action_lst = [],[], []
         obs = self.env.reset()
         done = False
 
+        # actor for evaluation 
+        agent.actor.eval()
+
         while not done: 
-            # select action
-            action = agent.actor.select_action(np.array(obs))
+            # select  actor ation
+            action = agent.actor.select_action(obs)
+
 
             # add exploratory noise
             if is_action_noise:
@@ -108,7 +113,7 @@ class Agent:
             # Simulate one step in environment
             next_obs, reward, done, info = self.env.step(action.flatten())
             rewards.append(reward)
-            action_lst.append(self.env.last_u)
+            action_lst.append(self.env.last_u)  # actuator deflection 
 
             # Add experiences to buffer:
             if store_transition:
@@ -121,7 +126,6 @@ class Agent:
                 # save for future validation
                 state_lst.append(self.env.x)
                 
-
             # update agent obs
             obs = next_obs
 
@@ -134,7 +138,7 @@ class Agent:
 
         # Compute BCs:
         actions = np.asarray(action_lst)
-        bcs = np.std(actions, axis = 0)
+        bcs = np.sum(np.abs(actions), axis = 0)
 
         return Episode(reward = np.sum(rewards), bcs = bcs, length = info['t'],\
                        state_history=state_lst, ref_signals = info['ref'], \
@@ -150,28 +154,30 @@ class Agent:
         for target_param, param in zip(rl_net.parameters(), evo_net.parameters()):
             target_param.data.copy_(param.data)
 
-    def get_pop_novelty(self):
-        epochs = self.args.ns_epochs
-        novelties = np.zeros(len(self.pop))
-        for _ in range(epochs):
-            transitions = self.replay_buffer.sample(self.args.batch_size)
-            batch = replay_memory.Transition(*zip(*transitions))
-            # each agent novelty
-            for i, net in enumerate(self.pop):
-                novelties[i] += (net.get_novelty(batch))
-        return novelties / epochs
+
+    def get_pop_novelty(self, bcs : np.array):
+        return np.sum(np.std(bcs, axis = 0))/bcs.shape[1]
 
     def train_rl(self) -> Dict[float, float]:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
             The frames are sampled from the common buffer.
         """
-        print('Train RL agent ...')
+        
         pgs_obj, TD_loss = [],[]
 
         if len(self.replay_buffer) > self.args.learn_start: 
-            
-            if self.champion_actor is not None: self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
-            # agent has seen some experiences already
+            print('Train RL agent ...')
+            # prepare for training
+            self.rl_agent.actor.train()
+
+            # select target policy
+            if self.args.use_champion_target:
+                if self.champion_actor is not None:
+                    self.evo_to_rl(self.rl_agent.actor_target, self.champion_actor)
+            else:
+                self.champion_actor = None 
+
+            # train over generation experiences
             for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
                 self.rl_iteration+=1
 
@@ -186,18 +192,19 @@ class Agent:
     def validate_agent (self, agent : genetic_agent.Actor) -> Tuple[float, float, Episode]:
         """ Evaluate the  given actor and do NOT store these trials. 
         """
-        test_scores, bcs = [], []
+        test_scores, episode_lengths, bcs = [], [], []
 
         for _ in range(self.validation_tests):
             last_episode = self.evaluate(agent, is_action_noise = False,\
                                         store_transition = False) 
             test_scores.append(last_episode.reward)
+            episode_lengths.append(last_episode.length)
             bcs.append(last_episode.bcs)
 
-        test_score = np.mean(test_scores)
-        test_sd = np.std(test_scores)
+        test_score = np.mean(test_scores); test_sd = np.std(test_scores)
+        ep_len = np.mean(episode_lengths); ep_len_sd = np.std(episode_lengths)
 
-        return test_score,test_sd, last_episode
+        return test_score,test_sd, ep_len, ep_len_sd , last_episode
 
     def get_history (self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
@@ -210,63 +217,23 @@ class Agent:
         self.gen_frames = 0
         self.iterations += 1
         
-        best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
-        test_score = 1; test_sd = 1; 
 
-        bcs_lst, lengths = [], []
-
-        '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
-        if len(self.pop):
-            rewards = np.zeros((self.args.num_evals, self.args.pop_size))
-            bcs = np.zeros((self.args.num_evals, self.args.pop_size,3))
-
-            # Evaluate genomes/individuals
-            # >>> loop over population AND store experiences
-            for j,net in enumerate(self.pop):   
-                for i in range(self.args.num_evals):
-                    episode = self.evaluate(net, is_action_noise = False,\
-                                                store_transition = True)
-                    rewards[i,j] = episode.reward
-                    bcs[i,j,:] = episode.bcs
-                    lengths.append(episode.length)
-
-            # take average stats
-            rewards = np.mean(rewards, axis = 0) 
-            bcs = np.mean(bcs_lst, axis = 0)
-            print(bcs.shape)
-            ep_len_avg = np.mean(lengths); ep_len_sd = np.std(lengths)
-
-            # get popualtion stats
-            best_train_fitness  = np.max(rewards)              # champion - highest reward
-            worst_train_fitness = np.min(rewards)
-            population_avg      = np.average(rewards)          # population_avg 
-            self.champion       = self.pop[np.argmax(rewards)]
-            self.champion_actor  = self.champion.actor         # unpack for RL critic updates 
-
-            # Validation test for NeuroEvolution 
-            test_score, test_sd, last_episode = self.validate_agent(self.champion)
-            self.champion_history = self.get_history(last_episode)
-
-            # NeuroEvolution's probabilistic selection and recombination step
-            elite_index = self.evolver.epoch(self.pop, rewards)
-
+        lengths = []
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
-        if self.args.pop_size == 0:
-            rl_extra_evals = 5
-            rewards = np.zeros((rl_extra_evals))
-            bcs     = np.zeros((rl_extra_evals,3))
+        rl_extra_evals = 5
+        rewards = np.zeros((rl_extra_evals))
+        bcs     = np.zeros((rl_extra_evals,3))
 
-            print('Info: playing extra episodes with action nosie for RL training')
-            for i in range(rl_extra_evals):
-                episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
-                lengths.append(episode.length)
-                rewards[i] = episode.reward
-                bcs[i,:] = episode.bcs
+        print('Info: playing extra episodes with action nosie for RL training')
+        for i in range(rl_extra_evals):
+            episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
+            lengths.append(episode.length)
+            rewards[i] = episode.reward
+            bcs[i,:] = episode.bcs
 
-            print('RL training reward:', np.average(rewards))
-            # print('RL training bcs:', np.average(bcs, axis = 0))
-            ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
+        print(f'RL training reward: {np.average(rewards):0.1f}')
+        ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
 
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
@@ -274,39 +241,22 @@ class Agent:
         rl_train_scores = self.train_rl()
 
         # Validate RL actor separately:
-        rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
+        rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
+
+        if self.args.pop_size == 0:
+            ep_len_avg = rl_ep_len
+            ep_len_sd = rl_ep_std
         self.rl_history = self.get_history(rl_episode)
 
-        ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''
-        if self.iterations % self.args.rl_to_ea_synch_period == 0 and len(self.pop):
-            # Replace any index different from the new elite
-            replace_index = np.argmin(rewards)
 
-            if replace_index == elite_index:
-                replace_index = (replace_index + 1) % len(self.pop)
-
-            self.rl_to_evo(self.rl_agent, self.pop[replace_index])
-            self.evolver.rl_policy = replace_index
-            print('Sync from RL --> Evolution')
-
-        # # Get popualtion nvelty:
-        # TODO: chek this later
-        # pop_novelty = self.get_pop_novelty()
         # -------------------------- Collect statistics --------------------------
         return {
-            'best_train_fitness': best_train_fitness,
-            'test_score':  test_score,
-            'test_sd':     test_sd,
-            'pop_avg':     population_avg,
-            'pop_min':     worst_train_fitness,
-            'elite_index': elite_index,
             'rl_reward':   rl_reward,
             'rl_std':      rl_std,
             'avg_ep_len':  ep_len_avg, 
             'ep_len_sd':   ep_len_sd, 
             'PG_obj':      rl_train_scores['PG_obj'],
             'TD_loss':     rl_train_scores['TD_loss'],
-            'pop_novelty': 0.,
         }
 
 
@@ -344,5 +294,17 @@ class Agent:
                 self.rl_history, header = str(self.num_episodes))
 
         # NOTE might want to save RL state-history for future cheks
-        print('> state history in ' + str(filename) + '\n')
-        print("Progress Saved")
+        print('> Saved state history in ' + str(filename) + '\n')
+
+
+
+    # def get_pop_novelty(self): OLD
+    #     epochs = self.args.ns_epochs
+    #     novelties = np.zeros(len(self.pop))
+    #     for _ in range(epochs):
+    #         transitions = self.replay_buffer.sample(self.args.batch_size)
+    #         batch = replay_memory.Transition(*zip(*transitions))
+    #         # each agent novelty
+    #         for i, net in enumerate(self.pop):
+    #             novelties[i] += (net.get_novelty(batch))
+    #     return novelties / epochs

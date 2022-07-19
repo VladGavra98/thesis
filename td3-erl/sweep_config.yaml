@@ -1,0 +1,65 @@
+program: tuner.py
+command:
+  - /usr/bin/env
+  - python3.8
+  - ${program}
+  - ${args}
+project: sweeps-td3
+early_terminate:
+  min_iter: 12
+  type: hyperband
+method: bayes
+metric:
+  goal: maximize
+  name: rl_reward
+parameters:
+  batch_size:
+    distribution: categorical
+    values: 
+    - 32
+    - 64
+    - 86
+    - 100
+    - 128
+  actor_activation:
+    distribution: categorical
+    values: 
+    - 'elu'
+    - 'tanh'
+    - 'relu'
+  buffer_size:
+    distribution: categorical
+    values:
+    - 50000
+    - 100000
+    - 150000
+    - 200000
+    - 250000
+    - 300000
+  gamma:
+    distribution: categorical
+    values: 
+    - 0.97
+    - 0.98
+    - 0.99
+
+  hidden_size:
+    distribution: categorical
+    values:
+    - 12
+    - 24
+    - 32
+    - 50
+    - 72
+  lr:
+    distribution: uniform
+    max: 0.0022
+    min: 0.001
+  noise_sd:
+    distribution: uniform
+    max: 0.35
+    min: 0.2
+  num_layers:
+    distribution: int_uniform
+    max: 3
+    min: 1

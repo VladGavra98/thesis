@@ -60,11 +60,11 @@ class BaseEnv(gym.Env, ABC):
         Might not be needed always since it depends on the activation of the output layer. 
 
         Args:
-            clipped_action (mp.ndarray): Clipped action vector (deflections outputed by actor)
+            clipped_action (np.ndarray): Clipped action vector (deflections outputed by actor)
 
         Returns:
             np.ndarray: action vector in the physical limits
-        """        
+        """     
         low, high = self.action_space.low, self.action_space.high
         return low + 0.5 * (clipped_action + 1.0) * (high - low)
 
@@ -75,7 +75,7 @@ class CitationEnv(BaseEnv):
     n_actions_full : int = 10
     n_obs_full : int = 12
 
-    def __init__(self, configuration : str = None):
+    def __init__(self, configuration : str = None, mode : str = ""):
         if 'symmetric'  in configuration.lower():
             print('Symmetric control only.')
             self.n_actions = 1                  # theta
@@ -89,6 +89,10 @@ class CitationEnv(BaseEnv):
             self.n_actions = 3
             self.obs_idx = range(10)            # all states         
 
+        # use incremental control
+        self.use_incremental = 'incremental' in mode.lower()
+        if self.use_incremental: print('Incremental control.')
+
         self.t = 0
         self.dt = 0.01      # [s]
         self.t_max = 20.0   # [s]
@@ -98,8 +102,9 @@ class CitationEnv(BaseEnv):
         # 3,  4, 5   -> V, alpha, beta
         # 6,  7, 8   -> phi, theta, psi
         # 9, 10, 11  -> he, xe, ye
-        self.x: np.ndarray       = None    # aircraft state vector 
-        self.obs: np.ndarray     = None    # observation vector -- used for configurations & learning 
+        self.x: np.ndarray        = None    # aircraft state vector 
+        self.obs: np.ndarray      = None    # observation vector -- used for configurations & learning 
+        self.last_obs: np.ndarray = None
 
         # Have an internal storage of last action [10]
         # Inputs:
@@ -112,14 +117,22 @@ class CitationEnv(BaseEnv):
         self.ref: List[signals.BaseSignal] = None
         
         # actuator bounds
-        self.rate_bound = np.deg2rad(25)        #  [deg/s] 
+        if self.use_incremental:
+            self.bound = np.deg2rad(25)        #  [deg/s] 
+        else:
+            self.bound = np.deg2rad(10)        #  [deg]
 
         # state bounds
         self.max_theta = np.deg2rad(60.)
         self.max_phi = np.deg2rad(75.)
-
-        # observation space: aircraft state + actuator state + control states (equal to actuator states)
-        self.n_obs : int = len(self.obs_idx) + 2 * self.n_actions 
+        
+        # observation space: 
+        if self.use_incremental:
+            # aircraft state + actuator state + control states error (equal to actuator states)
+            self.n_obs : int = len(self.obs_idx) +  2 * self.n_actions 
+        else:
+            # aircraft state + control states error
+            self.n_obs : int = len(self.obs_idx) +  self.n_actions 
 
         # error
         self.error : np.ndarray = np.zeros((self.n_actions))
@@ -129,22 +142,21 @@ class CitationEnv(BaseEnv):
             self.cost = 6/np.pi*np.array([1.])  # individual reward scaler [theta]
         else:
             self.cost = 6/np.pi*np.array([1., 1.,1.])     # scaler [theta, phi, beta]
-        self.reward_scale = -1/3                          # scaler
         self.cost         = self.cost[:self.n_actions]
         self.max_bound    = np.ones(self.error.shape)     # bounds
 
     @property
     def action_space(self) -> Box:
         return Box(
-            low   = -self.rate_bound * np.ones(self.n_actions),
-            high  =  self.rate_bound * np.ones(self.n_actions),
+            low   = -self.bound * np.ones(self.n_actions),
+            high  =  self.bound * np.ones(self.n_actions),
             dtype =  np.float64,
         )
     @property
     def observation_space(self) -> Box:
         return Box(
-            low   = -10 * np.ones(self.n_obs),
-            high  =  10 * np.ones(self.n_obs),
+            low   = -30 * np.ones(self.n_obs),
+            high  =  30 * np.ones(self.n_obs),
             dtype = np.float64,
         )
     @property
@@ -224,25 +236,25 @@ class CitationEnv(BaseEnv):
         _crtl = np.asarray([self.theta,  self.phi, self.beta])
         return _crtl[:self.n_actions]
 
+
     def calc_error(self) -> np.array:
         self.error[:self.n_actions] = self.get_reference_value() - self.get_controlled_state()
 
     def get_reward(self) -> float:
         self.calc_error()
-        reward_vec = np.linalg.norm(np.clip(self.cost * self.error,-self.max_bound, self.max_bound), ord=1)
-        reward     = self.reward_scale * (reward_vec.sum() / self.error.shape[0])
-        return reward
+        reward_vec = np.abs(np.clip(self.cost * self.error,-self.max_bound, self.max_bound))
+        return - reward_vec.sum() / self.error.shape[0]
     
-    def filter_action(self, action : np.ndarray, tau : float = 1) -> np.ndarray:
+    def incremental_control(self, action : np.ndarray) -> np.ndarray:
         """ Return low-pass filtered incremental control action. 
         """
-        return (1 - tau) * self.last_u + tau * action * self.dt
+        return self.last_u + action * self.dt
 
     def check_envelope_bounds():
         raise NotImplementedError
 
     def pad_action(self, action : np.ndarray) -> np.ndarray:
-        """ Pad the non-calculated deflection valeus with 0. 
+        """ Pad action with 0 to correpond to the Simulink dimensions. 
         """
         citation_input = np.pad(action,
                                 (0, self.n_actions_full - self.n_actions), 
@@ -268,7 +280,10 @@ class CitationEnv(BaseEnv):
         self.init_ref()
 
         # Build observation
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
+        self.obs = np.hstack((self.error.flatten(), self.x[self.obs_idx]))
+        self.last_obs: np.ndarray  = self.obs[:]
+
+        if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
 
         return self.obs
 
@@ -283,35 +298,44 @@ class CitationEnv(BaseEnv):
         """        
         is_done = False
 
-        # pad action to correpond to the Simulink dimensions
+        # scale action to actuator rate bounds 
         action = self.scale_action(action)   # scaled to actuator limits 
 
         # incremental control input: 
-        u = self.filter_action(action, tau = 1.)
-        self.last_u = u
+        if self.use_incremental:
+            u = self.incremental_control(action)
+        else:
+            u = action
 
-        _input = self.pad_action(action)
+        # citation input 
+        _input = self.pad_action(u)
         self.x = citation.step(_input)
         
         # Reward using clipped error
         reward = self.get_reward()
-
+             
         # Update observation based on perfect observations & actuator state
-        self.obs = np.concatenate((self.error.flatten(), self.x[self.obs_idx], self.last_u), axis = 0)
-
+        self.obs = np.hstack((self.error.flatten(), self.x[self.obs_idx]))
+        self.last_u = u
+        if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
+        
         # Step time
         self.t  += self.dt
+        self.last_obs = self.obs
 
         if self.t >= self.t_max \
             or np.abs(self.theta) > self.max_theta \
-            or np.abs(self.phi)   > self.max_phi :
-
-            if np.any(np.isnan(self.x)):
-                print('NaN encountered: ', self.x)
+            or np.abs(self.phi)   > self.max_phi:
 
             is_done = True
-            reward += 1/self.dt * (self.t_max - self.t) * self.reward_scale * 10 # negative reward for dying soon
+            reward -= 1/self.dt * (self.t_max - self.t)  * 2 # negative reward for dying soon
    
+
+        if np.any(np.isnan(self.x)):
+            print('NaN encountered: ', self.x)
+            is_done = True
+            reward -= 1/self.dt * (self.t_max - self.t) * 2 # negative reward for dying soon
+        
         # info:
         info = {
             "ref": self.ref,
@@ -320,20 +344,33 @@ class CitationEnv(BaseEnv):
         }
         return self.obs, reward, is_done, info
 
-    # def check_envelope_bounds(self, reward):
-    #     # Check if Done:
- 
-    #     return is_done
-
     def render(self, **kwargs):
         """ just to make the linter happy (we are deriving from gym.Env)"""
         pass
-
+    
     @staticmethod
     def finish():
         """ Terminate the simulink thing."""
         citation.terminate()
 
+class PID:
+    def __init__(self, P_gain, I_gain, D_gain, dt : float = 0.01) -> None:
+        self.p = P_gain
+        self.d = D_gain
+        self.i = I_gain
+
+        self.der : np.float64 = 0.
+        self.int : np.float64 = 0.
+
+        self.dt : np.float64 = dt
+
+    def select_action(self, state) -> np.ndarray:
+        state = state[:3]
+        return  -(self.p * state + self.i * self.int + self.d * self.der)
+
+    def update(self, prev_state : np.ndarray, state : np.ndarray) -> None:
+        self.int += state * self.dt
+        self.der  = (state - prev_state) / self.dt
 
 
 def evaluate(verbose : bool = False):
@@ -342,12 +379,13 @@ def evaluate(verbose : bool = False):
     done = False
     obs = env.reset()
 
-    # PID gains
-    p, i, d = 20, 6,5
+    # PID actor
+    p, i, d = 6., 6., 5.            # gains
+    pid_actor = PID(p, i, d, dt = env.dt)
     
     ref_beta, ref_theta, ref_phi = [], [], []
-    x_lst, rewards,u_lst, nz_lst = [],[], [], []
-    error_int,error_dev = np.zeros((env.action_space.shape[0])), np.zeros((env.action_space.shape[0]))
+    x_lst, rewards,u_lst, nz_lst = [], [], [], []
+
     
     while not done:
         u_lst.append(env.last_u)
@@ -355,18 +393,19 @@ def evaluate(verbose : bool = False):
         nz_lst.append(env.nz)
 
         # PID actor:
-        action = -(p * obs[:env.n_actions] + i * error_int + d * error_dev)
+        action = pid_actor.select_action(obs[:env.n_actions])
 
         if action.shape[0] > 1:
             action[-1]*=-1.5  # rudder needs some scaling
-        error_dev  = obs[:env.n_actions]
-
-        if verbose:
-            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
-            
 
         # Simulate one step in environment
         action = np.clip(action,-1,1)
+
+        if verbose:
+            print(f'Action: {np.rad2deg(action)} -> deflection: {np.rad2deg(env.last_u)}')
+            print(f't:{env.t:0.2f} theta:{env.theta:.03f} q:{env.q:.03f} alpha:{env.alpha:.03f}   V:{env.V:.03f} H:{env.H:.03f}')
+            print(np.rad2deg(env.obs))
+
         obs, reward, done, info = env.step(action.flatten())
         next_obs = obs
 
@@ -379,9 +418,8 @@ def evaluate(verbose : bool = False):
         assert np.isclose(env.error, obs[:env.n_actions]).all()
  
         # Update
+        pid_actor.update(obs[:env.n_actions], next_obs[:env.n_actions] )
         obs = next_obs
-        error_int += obs[:env.n_actions]*env.dt
-        error_dev = ( obs[:env.n_actions]- error_dev)/env.dt
 
         # save 
         rewards.append(reward)
@@ -405,10 +443,10 @@ if __name__=='__main__':
     # init env an actor
     env = config.select_env('phlab_attitude')
 
-    
     trials = 2
     verbose = False
     fitness_lst =[]
+
     for _ in tqdm(range(trials)):
         ref_beta, ref_theta, ref_phi, x_lst, rewards, u_lst, nz_lst = evaluate(verbose)
         fitness_lst.append(sum(rewards))
@@ -437,7 +475,6 @@ if __name__=='__main__':
     axs[1,0].plot(time,np.rad2deg(x_lst[:,6]), label = r'$\phi$')
     axs[1,0].plot(time,np.rad2deg(x_lst[:,0]), label = r'$p$')
     axs[3,0].plot(time,x_lst[:,9], label = 'H')
-
 
     # plot actions
     axs[0,1].plot(time,np.rad2deg(u_lst[:,0]), linestyle = '--',label = r'$\delta_e$ [deg]')
