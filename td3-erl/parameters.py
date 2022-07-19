@@ -43,7 +43,7 @@ class Parameters:
         self.use_ddpg = cla.use_ddpg     # default isFalse
         self.test_ea = cla.test_ea
         if self.test_ea:
-            self.frac_frames_train = 0.01  
+            self.frac_frames_train = 0. 
         else:
             self.frac_frames_train = 1.  # default training 
 
@@ -58,8 +58,8 @@ class Parameters:
         self.seed  = cla.seed
 
         # hidden layer
-        self.num_layers = 3
-        self.hidden_size = 43   # 64 for TD3-only 
+        self.num_layers = 2
+        self.hidden_size = 43   
         self.activation_actor   = 'relu'
         self.activation_critic  = 'elu'  
 
@@ -71,6 +71,9 @@ class Parameters:
             self.alpha = 0.7
             self.beta_zero = 0.5
 
+        # CAPS
+        self.use_caps = cla.use_caps
+        
         # ==================================    TD3 Params  =============================================
         if not self.use_ddpg:
             self.policy_update_freq = 3      # minimum for TD3

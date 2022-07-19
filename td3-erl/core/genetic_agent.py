@@ -6,6 +6,7 @@ from core import replay_memory
 from core.mod_utils import is_lnorm_key, LayerNorm, activations
 
 
+
 class GeneticAgent:
     def __init__(self, args: Parameters):
 
@@ -76,7 +77,7 @@ class Actor(nn.Module):
 
         # Input Layer 
         layers.extend([
-            nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True),
+            # nn.BatchNorm1d(args.state_dim, affine=True, track_running_stats=True),
             nn.Linear(args.state_dim, h),
             activation,
         ])
@@ -158,3 +159,5 @@ class Actor(nn.Module):
                 continue
             count += param.numel()
         return count
+
+
