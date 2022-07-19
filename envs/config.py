@@ -3,7 +3,8 @@ from envs.phlabenv import CitationEnv
 try:
     from envs.lunarlander import LunarLanderWrapper
 except:
-    print('LunarLanderContinuous not available on this system')
+    print( 'LunarLanderContinunous not available on this machine.' )
+
 
 def select_env (environemnt_name : str):
     _name = environemnt_name
