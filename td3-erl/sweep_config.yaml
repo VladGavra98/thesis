@@ -21,12 +21,12 @@ parameters:
     - 86
     - 100
     - 128
-  actor_activation:
-    distribution: categorical
-    values: 
-    - 'elu'
-    - 'tanh'
-    - 'relu'
+  activation_actor:
+      distribution: categorical
+      values: 
+      - 'elu'
+      - 'tanh'
+      - 'relu'
   buffer_size:
     distribution: categorical
     values:

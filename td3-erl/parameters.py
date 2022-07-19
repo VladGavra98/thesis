@@ -46,7 +46,7 @@ class Parameters:
         # hidden layer
         self.num_layers = cla.num_layers
         self.hidden_size = cla.hidden_size    # 64 for TD3-only 
-        self.activation_actor   = 'relu'
+        self.activation_actor   = cla.activation_actor
         self.activation_critic  = 'elu'  
 
         self.learn_start = 10_000       # frames accumulated before grad updates            

@@ -24,7 +24,7 @@ parser.add_argument('--num_layers', default =2, type = int)
 parser.add_argument('--hidden_size', default =32, type = int)
 parser.add_argument('--buffer_size', default = 200000, type = int)
 parser.add_argument('--batch_size', default = 64, type = int)
-
+parser.add_argument('--activation_actor', default = 'elu', type = str)
 parser.add_argument('--noise_sd', default = 0.2, type = float)
 
 
