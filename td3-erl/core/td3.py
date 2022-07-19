@@ -123,10 +123,10 @@ class TD3(object):
 
         if self.args.use_caps:
             self.caps_dict = {
-                        'lambda_s' : 0.5,
-                        'lambda_t' : 0.1,
-                        'eps_sd'    : 0.05,
-                        }
+                            'lambda_s' : 0.5,
+                            'lambda_t' : 0.1,
+                            'eps_sd'    : 0.05,
+                             }
 
 
     def update_parameters(self, batch, iteration : int, champion_policy = None) -> Tuple[float,float]:
@@ -202,7 +202,7 @@ class TD3(object):
             action_bar = self.actor.forward(state_bar) 
             caps_loss = self.caps_dict['lambda_t'] * F.mse_loss(action_batch, next_action_batch) + \
                         self.caps_dict['lambda_s'] * F.mse_loss(action_batch, action_bar)
-            
+
             policy_grad_loss += caps_loss
 
         # backprop

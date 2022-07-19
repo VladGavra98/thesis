@@ -453,7 +453,7 @@ if __name__=='__main__':
     env = config.select_env('phlab_attitude')
 
     trials = 2
-    verbose = True
+    verbose = False
     fitness_lst =[]
 
     for _ in tqdm(range(trials)):

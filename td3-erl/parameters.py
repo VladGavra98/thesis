@@ -59,7 +59,7 @@ class Parameters:
 
         # hidden layer
         self.num_layers = 3
-        self.hidden_size = 43   # 64 for TD3-only 
+        self.hidden_size = 43   
         self.activation_actor   = 'relu'
         self.activation_critic  = 'elu'  
 
