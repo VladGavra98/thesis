@@ -100,9 +100,9 @@ class Agent:
         agent.actor.eval()
 
         while not done: 
-            # start with 0 for stability
             # select  actor ation
-            action = agent.actor.select_action(np.array(obs))
+            action = agent.actor.select_action(obs)
+
 
             # add exploratory noise
             if is_action_noise:
@@ -192,18 +192,19 @@ class Agent:
     def validate_agent (self, agent : genetic_agent.Actor) -> Tuple[float, float, Episode]:
         """ Evaluate the  given actor and do NOT store these trials. 
         """
-        test_scores, bcs = [], []
+        test_scores, episode_lengths, bcs = [], [], []
 
         for _ in range(self.validation_tests):
             last_episode = self.evaluate(agent, is_action_noise = False,\
                                         store_transition = False) 
             test_scores.append(last_episode.reward)
+            episode_lengths.append(last_episode.length)
             bcs.append(last_episode.bcs)
 
-        test_score = np.mean(test_scores)
-        test_sd = np.std(test_scores)
+        test_score = np.mean(test_scores); test_sd = np.std(test_scores)
+        ep_len = np.mean(episode_lengths); ep_len_sd = np.std(episode_lengths)
 
-        return test_score,test_sd, last_episode
+        return test_score,test_sd, ep_len, ep_len_sd , last_episode
 
     def get_history (self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
@@ -216,8 +217,8 @@ class Agent:
         self.gen_frames = 0
         self.iterations += 1
         
-        lengths = []
 
+        lengths = []
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
         rl_extra_evals = 5
@@ -240,8 +241,13 @@ class Agent:
         rl_train_scores = self.train_rl()
 
         # Validate RL actor separately:
-        rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
+        rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
+
+        if self.args.pop_size == 0:
+            ep_len_avg = rl_ep_len
+            ep_len_sd = rl_ep_std
         self.rl_history = self.get_history(rl_episode)
+
 
         # -------------------------- Collect statistics --------------------------
         return {
