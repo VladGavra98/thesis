@@ -152,7 +152,6 @@ class Agent:
         for target_param, param in zip(rl_net.parameters(), evo_net.parameters()):
             target_param.data.copy_(param.data)
 
-
     def get_pop_novelty(self, bcs : np.array):
         return np.sum(np.std(bcs, axis = 0))/bcs.shape[1]
 
