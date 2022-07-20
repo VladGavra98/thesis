@@ -10,23 +10,24 @@ import envs.config
 
 
 '''                           Globals                                                        '''
-num_episodes = 250
-num_frames = num_episodes * 2000
-
 # -store_true means that it becomes true if I mention the argument
 parser = argparse.ArgumentParser()
 
 
 parser.add_argument('--run_name', default='test', type=str)
-parser.add_argument('--gamma', default = 0.98, type = float)
-parser.add_argument('--lr', default = 0.0010, type = float)
-parser.add_argument('--num_layers', default = 2, type = int)
-parser.add_argument('--hidden_size', default =32, type = int)
-parser.add_argument('--buffer_size', default = 200_000, type = int)
-parser.add_argument('--batch_size', default = 64, type = int)
-parser.add_argument('--activation_actor', default = 'elu', type = str)
-parser.add_argument('--noise_sd', default = 0.20, type = float)
+parser.add_argument('--should_log', action='store_true')
+parser.add_argument('--next_save', default=100, type=int)
+parser.add_argument('--frames', default=800000, type=int)
+parser.add_argument('--gamma', default = 0.99, type = float)
+parser.add_argument('--lr', default =0.00045, type = float)
+parser.add_argument('--num_layers', default = 3, type = int)
+parser.add_argument('--hidden_size', default =64,  type = int)
+parser.add_argument('--buffer_size', default = 100_000, type = int)
+parser.add_argument('--batch_size',  default =64, type = int)
+parser.add_argument('--activation_actor', default = 'relu', type = str)
+parser.add_argument('--noise_sd', default =0.32, type = float)
 
+parser.add_argument('--use_caps', default =True, type = bool)
 
 if __name__ == "__main__":
     cla = parser.parse_args()
@@ -44,7 +45,7 @@ if __name__ == "__main__":
 
     # strat trackers
     print('\033[1;32m WandB logging started')
-    run = wandb.init(project="sweeps-td3",
+    run = wandb.init(project="phlab",
                     entity="vgavra",
                     dir='../logs',
                     config=params_dict)
@@ -67,6 +68,7 @@ if __name__ == "__main__":
 
     # Main training loop:
     start_time = time.time()
+    next_save = parameters.next_save
     
     while agent.num_frames <= parameters.num_frames:
 
@@ -80,4 +82,12 @@ if __name__ == "__main__":
 
         wandb.log(stats)
 
+        if parameters.should_log and agent.num_episodes > next_save:
+            # elite_index = stats['elite_index']  # champion index
+            next_save += parameters.next_save
+            agent.save_agent(parameters)
+
+    if parameters.should_log:
+        agent.save_agent(parameters)
+    
     run.finish()

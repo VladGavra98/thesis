@@ -20,8 +20,10 @@ class Parameters:
         self.save_periodic =  False
         
         # Number of Frames to Run
-        
-        self.num_frames = 800_000
+        self.num_frames = cla.frames
+        self.should_log = cla.should_log
+        if self.should_log:
+            self.next_save = cla.next_save
   
         # Novelty Search
         self.ns = False
@@ -60,7 +62,7 @@ class Parameters:
             self.beta_zero = 0.5
 
         # CAPS
-        self.use_caps = True
+        self.use_caps = cla.use_caps
         
         # ==================================    TD3 Params  =============================================
  
