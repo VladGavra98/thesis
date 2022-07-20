@@ -48,18 +48,18 @@ class Parameters:
             self.frac_frames_train = 1.  # default training 
 
         self.batch_size = 64
-        self.buffer_size = 50_000        
-        self.lr    = 0.001
-        self.gamma = 0.98
-        self.noise_sd = 0.3
+        self.buffer_size = 100_000        
+        self.lr    = 0.00043
+        self.gamma = 0.99
+        self.noise_sd = 0.3363
         self.use_done_mask = True
         self.use_ounoise = cla.use_ounoise
         self.tau   = 0.005   
         self.seed  = cla.seed
 
         # hidden layer
-        self.num_layers = 2
-        self.hidden_size = 72
+        self.num_layers = 3
+        self.hidden_size = 96
         self.activation_actor   = 'relu'
         self.activation_critic  = 'elu'  
 
@@ -91,7 +91,10 @@ class Parameters:
             # champion is target actor
 
             # increase buffer size for more experiences
-            self.buffer_size*= self.pop_size//2
+            self.buffer_size*= self.pop_size
+
+            # decrease lr:
+            self.lr /= self.pop_size
 
             # Num. of trials during evaluation step
             self.num_evals = 3
