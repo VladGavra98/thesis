@@ -1,0 +1,18 @@
+wandb_version: 1
+
+activation_actor:
+  value: tanh
+batch_size:
+  value: 86
+buffer_size:
+  value: 150000
+gamma:
+  value: 0.97
+hidden_size:
+  value: 72
+lr:
+  value: 0.0014471975448171104
+noise_sd:
+  value: 0.2300803500601012
+num_layers:
+  value: 3

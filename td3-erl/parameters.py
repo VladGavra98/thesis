@@ -47,7 +47,7 @@ class Parameters:
         # hidden layer
 
         self.num_layers = cla.num_layers
-        self.hidden_size = cla.hidden_size    # 64 for TD3-only 
+        self.hidden_size = cla.hidden_size    
         self.activation_actor   = cla.activation_actor
         self.activation_critic  = 'elu'  
 
@@ -60,7 +60,7 @@ class Parameters:
             self.beta_zero = 0.5
 
         # CAPS
-        self.use_caps = cla.use_caps
+        self.use_caps = True
         
         # ==================================    TD3 Params  =============================================
  

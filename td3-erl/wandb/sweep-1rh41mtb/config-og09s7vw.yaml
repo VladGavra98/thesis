@@ -1,0 +1,18 @@
+wandb_version: 1
+
+activation_actor:
+  value: relu
+batch_size:
+  value: 64
+buffer_size:
+  value: 100000
+gamma:
+  value: 0.99
+hidden_size:
+  value: 96
+lr:
+  value: 0.0004335241847225217
+noise_sd:
+  value: 0.33632536088153775
+num_layers:
+  value: 3

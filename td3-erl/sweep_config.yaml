@@ -24,7 +24,6 @@ parameters:
   activation_actor:
       distribution: categorical
       values: 
-      - 'elu'
       - 'tanh'
       - 'relu'
   buffer_size:
@@ -35,31 +34,29 @@ parameters:
     - 150000
     - 200000
     - 250000
-    - 300000
   gamma:
     distribution: categorical
     values: 
     - 0.97
     - 0.98
     - 0.99
-
   hidden_size:
     distribution: categorical
     values:
-    - 12
     - 24
     - 32
     - 50
     - 72
+    - 96
   lr:
     distribution: uniform
     max: 0.0022
-    min: 0.001
+    min: 0.0004
   noise_sd:
     distribution: uniform
     max: 0.35
-    min: 0.2
+    min: 0.20
   num_layers:
     distribution: int_uniform
     max: 3
-    min: 1
+    min: 2
