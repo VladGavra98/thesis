@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
-from sys import platform
 import pandas as pd
 from pathlib import Path
 
@@ -28,6 +27,7 @@ color_erl  = colors[3] if 'seaborn-darkgrid' in style else colors[0]
 c_nominal  = colors[0] if 'seaborn-darkgrid' in style else colors[1]
 c_fault1   = '#FBC15E' if 'seaborn-darkgrid' in style else colors[4]
 c_fault2   = colors[4] if 'seaborn-darkgrid' in style else colors[5]
+
 # Globals:
 savefig = True
 # nice purple: '#988ED5'
@@ -137,22 +137,7 @@ def plot_fault_tolerancy():
         fig.savefig('Results_pderl/Plots/bar_chart.png')
 
 
-#-----------------------------------------------------------------------------
-def load_from_csv(log_file : str, agent_name):
 
-    # Load data
-    logs_dir = Path(log_file)
-    logs = logs_dir / Path(agent_name) 
-
-    score_arr = np.genfromtxt(logs.as_posix() + '_frames.csv' , skip_header= 1, delimiter=',')
-    std_arr = np.genfromtxt(logs.as_posix() + '_std_games.csv', skip_header= 1, delimiter=',')
-
-    # Retrieve x-axis arrays:
-    frames = score_arr[:,0]
-    games = std_arr[:,0]
-    score = score_arr[:,1];std = std_arr[:,1]
-
-    return score,std,frames,games
 
 if __name__ == '__main__':
 
@@ -168,8 +153,7 @@ if __name__ == '__main__':
     frames_erl= df['frames'].to_numpy()
     games_erl = df['games'].to_numpy()
 
-    # Load ddpg:
-    ddpg_score, ddpg_std, frames_ddpg,  games_ddpg = load_from_csv('pderl/logs_ddpg', agent_name = 'ddpg') 
+
     # erl_score, erl_std, frames_erl,  games_erl = load_from_csv('pderl/logs_s1_e3_b5e04_PD', agent_name = 'erl') 
 
     # Slice: 

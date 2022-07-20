@@ -1,0 +1,16 @@
+wandb_version: 1
+
+batch_size:
+  value: 119
+buffer_size:
+  value: 246705
+gamma:
+  value: 0.9888342303384816
+hidden_size:
+  value: 73
+lr:
+  value: 0.000569308649615145
+noise_sd:
+  value: 0.26625539737262327
+num_layers:
+  value: 3

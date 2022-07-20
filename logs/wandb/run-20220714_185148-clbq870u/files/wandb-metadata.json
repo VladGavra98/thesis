@@ -1,0 +1,32 @@
+{
+    "os": "Linux-5.15.0-41-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "heartbeatAt": "2022-07-14T16:51:49.785711",
+    "startedAt": "2022-07-14T16:51:48.306315",
+    "docker": null,
+    "gpu": "Quadro M1200",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "--batch_size=129",
+        "--buffer_size=146724",
+        "--gamma=0.9726067249026764",
+        "--hidden_size=23",
+        "--lr=0.0013978503323350336",
+        "--noise_sd=0.22651530453544544",
+        "--num_layers=1"
+    ],
+    "state": "running",
+    "program": "tuner.py",
+    "codePath": "td3-erl/tuner.py",
+    "git": {
+        "remote": "https://github.com/VladGavra98/thesis.git",
+        "commit": "22a98ad2305a695a366e6d176ebee73bcbd1dd93"
+    },
+    "email": "vladgavra98@gmail.com",
+    "root": "/home/vlad/Documents/thesis",
+    "host": "vlad-HP",
+    "username": "vlad",
+    "executable": "/usr/bin/python3.8"
+}
