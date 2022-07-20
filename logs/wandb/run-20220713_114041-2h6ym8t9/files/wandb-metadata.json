@@ -1,0 +1,29 @@
+{
+    "os": "Linux-4.15.0-176-generic-x86_64-with-glibc2.27",
+    "python": "3.8.13",
+    "heartbeatAt": "2022-07-13T09:40:43.845436",
+    "startedAt": "2022-07-13T09:40:41.409798",
+    "docker": null,
+    "gpu": "Quadro FX 1700",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "-should_log",
+        "-run_name=TD3",
+        "-next_save=100",
+        "-pop_size=0"
+    ],
+    "state": "running",
+    "program": "./run_pderl.py",
+    "codePath": "td3-erl/run_pderl.py",
+    "git": {
+        "remote": "https://github.com/VladGavra98/thesis.git",
+        "commit": "a351db0225689c860fc12a449f14ad2359930b96"
+    },
+    "email": "\u00a8vladgavra98@gmail.com\u00a8",
+    "root": "/data/vgavra/thesis",
+    "host": "TUD277815",
+    "username": "vgavra",
+    "executable": "/usr/bin/python3.8"
+}

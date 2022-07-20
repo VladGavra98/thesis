@@ -99,8 +99,8 @@ class Agent:
         agent.actor.eval()
 
         while not done: 
-            # select action
-            action = agent.actor.select_action(np.array(obs))
+            # select  actor ation
+            action = agent.actor.select_action(obs)
 
             # add exploratory noise
             if is_action_noise:
@@ -189,18 +189,19 @@ class Agent:
     def validate_agent (self, agent : genetic_agent.Actor) -> Tuple[float, float, Episode]:
         """ Evaluate the  given actor and do NOT store these trials. 
         """
-        test_scores, bcs = [], []
+        test_scores, episode_lengths, bcs = [], [], []
 
         for _ in range(self.validation_tests):
             last_episode = self.evaluate(agent, is_action_noise = False,\
                                         store_transition = False) 
             test_scores.append(last_episode.reward)
+            episode_lengths.append(last_episode.length)
             bcs.append(last_episode.bcs)
 
-        test_score = np.mean(test_scores)
-        test_sd = np.std(test_scores)
+        test_score = np.mean(test_scores); test_sd = np.std(test_scores)
+        ep_len = np.mean(episode_lengths); ep_len_sd = np.std(episode_lengths)
 
-        return test_score,test_sd, last_episode
+        return test_score,test_sd, ep_len, ep_len_sd , last_episode
 
     def get_history (self, episode : Episode) -> np.ndarray:
         time = np.linspace(0, episode.length, len(episode.state_history))
@@ -214,8 +215,8 @@ class Agent:
         self.iterations += 1
         
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
-        test_score = 1; test_sd = 1; 
-
+        test_score = 1; test_sd = -1; 
+        pop_novelty = -1
         lengths = []
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
@@ -246,7 +247,7 @@ class Agent:
             self.champion_actor  = self.champion.actor         # unpack for RL critic updates 
 
             # Validation test for NeuroEvolution 
-            test_score, test_sd, last_episode = self.validate_agent(self.champion)
+            test_score, test_sd, _, _, last_episode = self.validate_agent(self.champion)
             self.champion_history = self.get_history(last_episode)
 
             # NeuroEvolution's probabilistic selection and recombination step
@@ -254,32 +255,21 @@ class Agent:
 
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
-        if self.args.pop_size == 0:
-            rl_extra_evals = 5
-            rewards = np.zeros((rl_extra_evals))
-            bcs     = np.zeros((rl_extra_evals,3))
-
-            print('Info: playing extra episodes with action nosie for RL training')
-            for i in range(rl_extra_evals):
-                episode = self.evaluate(self.rl_agent, is_action_noise=True, store_transition=True)
-                lengths.append(episode.length)
-                rewards[i] = episode.reward
-                bcs[i,:] = episode.bcs
-
-            print(f'RL training reward: {np.average(rewards):0.1f}')
-            ep_len_avg = np.average(lengths); ep_len_sd = np.std(lengths)
-
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
         # Gradient updates of RL actor and critic:
         rl_train_scores = self.train_rl()
 
         # Validate RL actor separately:
-        rl_reward,rl_std, rl_episode = self.validate_agent(self.rl_agent)
+        rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
+
+        if self.args.pop_size == 0:
+            ep_len_avg = rl_ep_len
+            ep_len_sd = rl_ep_std
         self.rl_history = self.get_history(rl_episode)
 
         ''' +++++++++++++++++++++++++++++++  Actor Injection +++++++++++++++++++++++++++++++++++++++'''
-        if self.iterations % self.args.rl_to_ea_synch_period == 0 and len(self.pop):
+        if self.iterations % self.args.rl_to_ea_synch_period == 0 and self.args.pop_size:
             # Replace any index different from the new elite
             replace_index = np.argmin(rewards)
 
@@ -290,8 +280,9 @@ class Agent:
             self.evolver.rl_policy = replace_index
             print('Sync from RL --> Evolution')
 
-        # # Get popualtion nvelty:
-        pop_novelty = self.get_pop_novelty(bcs)
+        # # Get popualtion novelty:
+        if self.args.pop_size:
+            pop_novelty = self.get_pop_novelty(bcs)
         # -------------------------- Collect statistics --------------------------
         return {
             'best_train_fitness': best_train_fitness,
@@ -306,7 +297,7 @@ class Agent:
             'ep_len_sd':   ep_len_sd, 
             'PG_obj':      rl_train_scores['PG_obj'],
             'TD_loss':     rl_train_scores['TD_loss'],
-            'pop_novelty': pop_novelty ,
+            'pop_novelty': pop_novelty,
         }
 
 
