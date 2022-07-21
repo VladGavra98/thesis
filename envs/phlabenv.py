@@ -236,7 +236,6 @@ class CitationEnv(BaseEnv):
         _crtl = np.asarray([self.theta,  self.phi, self.beta])
         return _crtl[:self.n_actions]
 
-
     def calc_error(self) -> np.array:
         self.error[:self.n_actions] = self.get_reference_value() - self.get_controlled_state()
 
@@ -263,6 +262,8 @@ class CitationEnv(BaseEnv):
         return citation_input
 
     def reset (self, **kwargs) -> np.ndarray:
+        self.finish()
+        
         # Reset time
         self.t = 0.0
 
@@ -319,10 +320,6 @@ class CitationEnv(BaseEnv):
         self.last_u = u
         if self.use_incremental: self.obs =  np.hstack((self.obs,self.last_u))
         
-        # Step time
-        self.t  += self.dt
-        self.last_obs = self.obs
-
         if self.t >= self.t_max \
             or np.abs(self.theta) > self.max_theta \
             or np.abs(self.phi)   > self.max_phi:
@@ -330,11 +327,15 @@ class CitationEnv(BaseEnv):
             is_done = True
             reward -= 1/self.dt * (self.t_max - self.t)  * 2 # negative reward for dying soon
    
-
         if np.any(np.isnan(self.x)):
             print('NaN encountered: ', self.x)
             is_done = True
             reward -= 1/self.dt * (self.t_max - self.t) * 2 # negative reward for dying soon
+            self.obs = self.last_obs
+
+        # Step time
+        self.t  += self.dt
+        self.last_obs = self.obs
         
         # info:
         info = {

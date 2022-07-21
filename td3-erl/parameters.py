@@ -92,10 +92,10 @@ class Parameters:
 
         if self.pop_size:
             # # increase buffer size for more experiences
-            # self.buffer_size *= self.pop_size
+            self.buffer_size *= self.pop_size
 
             # # decrease lr
-            # self.lr /= self.pop_size
+            self.lr /= self.pop_size
 
             # Num. of trials during evaluation step
             self.num_evals = 3

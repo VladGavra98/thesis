@@ -228,7 +228,7 @@ class Agent:
             for i in range(self.args.num_evals):
                 for j,net in enumerate(self.pop):   
                     episode = self.evaluate(net, is_action_noise = False,\
-                                                store_transition = (i == self.args.num_evals -1))
+                                                store_transition = True)
                     rewards[i,j] = episode.reward
                     bcs[i,j,:] = episode.bcs
                     lengths.append(episode.length)
@@ -254,12 +254,17 @@ class Agent:
 
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
-        rl_transitions = self.num_frames
+            
+        _rl_transitions = self.num_frames
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition = True)
-        rl_transitions -= self.num_frames
+        rl_transitions = self.num_frames - _rl_transitions
+        
+        # if self.rl_iteration < 1:
+        #     self.rl_agent.buffer.add_content_of(self.champion.buffer)
+        #     rl_transitions = self.rl_agent.buffer.__len__()
 
         # Gradient updates of RL actor and critic:
-        rl_train_scores = self.train_rl(rl_transitions)
+        rl_train_scores = self.train_rl(self.gen_frames )
 
         # Validate RL actor separately:
         rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
