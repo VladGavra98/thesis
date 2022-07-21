@@ -47,7 +47,6 @@ class Parameters:
         self.use_ounoise = False
 
         # hidden layer
-
         self.num_layers = cla.num_layers
         self.hidden_size = cla.hidden_size    
         self.activation_actor   = cla.activation_actor
@@ -62,7 +61,7 @@ class Parameters:
             self.beta_zero = 0.5
 
         # CAPS
-        self.use_caps = cla.use_caps
+        self.use_caps = True if cla.use_caps else False
         
         # ==================================    TD3 Params  =============================================
  

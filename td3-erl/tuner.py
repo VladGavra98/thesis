@@ -27,7 +27,7 @@ parser.add_argument('--batch_size',  default =64, type = int)
 parser.add_argument('--activation_actor', default = 'relu', type = str)
 parser.add_argument('--noise_sd', default =0.32, type = float)
 
-parser.add_argument('--use_caps', default =True, type = bool)
+parser.add_argument('--use_caps', action = 'store_true')
 
 if __name__ == "__main__":
     cla = parser.parse_args()
