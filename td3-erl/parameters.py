@@ -23,7 +23,7 @@ class Parameters:
         if cla.frames:
             self.num_frames = cla.frames
         else:
-            self.num_frames = 1_000_000
+            self.num_frames = 800_000
 
         # Synchronization
         # Overwrite sync from command line if value is passed
@@ -83,18 +83,19 @@ class Parameters:
         # =================================   NeuroEvolution Params =====================================
         # Number of actors in the population
         self.pop_size = cla.pop_size
+
+        # champion is target actor
         self.use_champion_target = cla.champion_target
         
         # Genetic memory size
-        self.individual_bs = 10_000
+        self.individual_bs = 100_000
+
         if self.pop_size:
-            # champion is target actor
+            # # increase buffer size for more experiences
+            # self.buffer_size *= self.pop_size
 
-            # increase buffer size for more experiences
-            self.buffer_size*= self.pop_size
-
-            # decrease lr:
-            self.lr /= self.pop_size
+            # # decrease lr
+            # self.lr /= self.pop_size
 
             # Num. of trials during evaluation step
             self.num_evals = 3
@@ -103,13 +104,13 @@ class Parameters:
             self.elite_fraction = 0.2
     
             # Mutation and crossover
-            self.crossover_prob = 0.0
             self.mutation_prob = 0.9
             self.mutation_mag = 0.05    # NOTE CHANGED FROM 0.1
             self.mutation_batch_size = self.batch_size
             self.proximal_mut = cla.proximal_mut
             self.distil_crossover = cla.use_distil
             self.distil_type = cla.distil_type
+            self.crossover_prob = 0.0
             self._verbose_mut = cla.verbose_mut
             self._verbose_crossover = cla.verbose_crossover
 

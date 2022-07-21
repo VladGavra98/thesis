@@ -155,14 +155,15 @@ class Agent:
     def get_pop_novelty(self, bcs : np.array):
         return np.sum(np.std(bcs, axis = 0))/bcs.shape[1]
 
-    def train_rl(self) -> Dict[float, float]:
+    def train_rl(self, rl_transitions : int) -> Dict[float, float]:
         """ Train the RL agent on the same number of frames seens by the entire actor populaiton during the last generation.
             The frames are sampled from the common buffer.
         """
-        print('Train RL agent ...')
+        
         pgs_obj, TD_loss = [],[]
 
-        if len(self.replay_buffer) > self.args.learn_start: 
+        if self.rl_agent.buffer.__len__() > self.args.learn_start: 
+            print('Train RL agent ...')
             # prepare for training
             self.rl_agent.actor.train()
 
@@ -174,10 +175,10 @@ class Agent:
                 self.champion_actor = None 
 
             # train over generation experiences
-            for _ in tqdm(range(int(self.gen_frames * self.args.frac_frames_train))):
+            for _ in tqdm(range(int(rl_transitions * self.args.frac_frames_train))):
                 self.rl_iteration+=1
 
-                batch = self.replay_buffer.sample(self.args.batch_size)
+                batch = self.rl_agent.buffer.sample(self.args.batch_size)
                 pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion_actor)
 
                 if pgl is not None: pgs_obj.append(-pgl)
@@ -214,8 +215,7 @@ class Agent:
         self.iterations += 1
         
         best_train_fitness  = 1; worst_train_fitness = 1;population_avg = 1; elite_index = -1
-        test_score = 1; test_sd = -1; 
-        pop_novelty = -1
+        test_score = 1; test_sd = -1; pop_novelty = -1
         lengths = []
 
         '''+++++++++++++++++++++++++++++++++   Evolution   +++++++++++++++++++++++++++++++++++++++++'''
@@ -228,7 +228,7 @@ class Agent:
             for j,net in enumerate(self.pop):   
                 for i in range(self.args.num_evals):
                     episode = self.evaluate(net, is_action_noise = False,\
-                                                store_transition = True)
+                                                store_transition = (i == self.args.num_evals -1))
                     rewards[i,j] = episode.reward
                     bcs[i,j,:] = episode.bcs
                     lengths.append(episode.length)
@@ -254,10 +254,13 @@ class Agent:
 
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
+        rl_transitions = self.num_frames
         self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
 
         # Gradient updates of RL actor and critic:
-        rl_train_scores = self.train_rl()
+        self.rl_agent.buffer.add_latest_from(self.champion.buffer, 2000)
+        rl_transitions -= self.num_frames
+        rl_train_scores = self.train_rl(rl_transitions + 2000)
 
         # Validate RL actor separately:
         rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
