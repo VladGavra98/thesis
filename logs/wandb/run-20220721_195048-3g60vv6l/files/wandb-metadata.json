@@ -1,0 +1,32 @@
+{
+    "os": "Linux-4.15.0-176-generic-x86_64-with-glibc2.27",
+    "python": "3.8.13",
+    "heartbeatAt": "2022-07-21T17:50:51.821098",
+    "startedAt": "2022-07-21T17:50:48.887617",
+    "docker": null,
+    "gpu": "Quadro FX 1700",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "--batch_size=64",
+        "--hidden_size=96",
+        "--lr=0.0004335",
+        "--noise_sd=0.3363253",
+        "--should_log",
+        "--run_name=zesty_nocaps",
+        "--next_save=200"
+    ],
+    "state": "running",
+    "program": "./tuner.py",
+    "codePath": "td3-erl/tuner.py",
+    "git": {
+        "remote": "https://github.com/VladGavra98/thesis.git",
+        "commit": "f21847dd5d0986c3cb2270477a5d10270e9f7ad0"
+    },
+    "email": "\u00a8vladgavra98@gmail.com\u00a8",
+    "root": "/data/vgavra/thesis",
+    "host": "TUD277815",
+    "username": "vgavra",
+    "executable": "/usr/bin/python3.8"
+}
