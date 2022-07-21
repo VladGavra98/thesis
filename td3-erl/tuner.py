@@ -48,7 +48,8 @@ if __name__ == "__main__":
     run = wandb.init(project="phlab",
                     entity="vgavra",
                     dir='../logs',
-                    config=params_dict)
+                    name = cla.run_name,
+                    config = params_dict)
     parameters.save_foldername = str(run.dir)
     # wandb.config.update({"run_name": run.name}, allow_val_change=True)
 
