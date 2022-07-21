@@ -225,8 +225,8 @@ class Agent:
 
             # Evaluate genomes/individuals
             # >>> loop over population AND store experiences
-            for j,net in enumerate(self.pop):   
-                for i in range(self.args.num_evals):
+            for i in range(self.args.num_evals):
+                for j,net in enumerate(self.pop):   
                     episode = self.evaluate(net, is_action_noise = False,\
                                                 store_transition = (i == self.args.num_evals -1))
                     rewards[i,j] = episode.reward
@@ -255,12 +255,11 @@ class Agent:
         ''' +++++++++++++++++++++++++++++++   RL  ++++++++++++++++++++++++++++++++++++++'''
         # Collect extra experience for RL training 
         rl_transitions = self.num_frames
-        self.evaluate(self.rl_agent, is_action_noise = True, store_transition=True)
+        self.evaluate(self.rl_agent, is_action_noise = True, store_transition = True)
+        rl_transitions -= self.num_frames
 
         # Gradient updates of RL actor and critic:
-        self.rl_agent.buffer.add_latest_from(self.champion.buffer, 2000)
-        rl_transitions -= self.num_frames
-        rl_train_scores = self.train_rl(rl_transitions + 2000)
+        rl_train_scores = self.train_rl(rl_transitions)
 
         # Validate RL actor separately:
         rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
