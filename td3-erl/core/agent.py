@@ -162,7 +162,7 @@ class Agent:
         
         pgs_obj, TD_loss = [],[]
 
-        if self.rl_agent.buffer.__len__() > self.args.learn_start: 
+        if len(self.replay_buffer) > self.args.learn_start: 
             print('Train RL agent ...')
             # prepare for training
             self.rl_agent.actor.train()
@@ -228,7 +228,7 @@ class Agent:
             for i in range(self.args.num_evals):
                 for j,net in enumerate(self.pop):   
                     episode = self.evaluate(net, is_action_noise = False,\
-                                                store_transition = True)
+                                                store_transition = (i==self.args.num_evals-1))
                     rewards[i,j] = episode.reward
                     bcs[i,j,:] = episode.bcs
                     lengths.append(episode.length)
@@ -264,7 +264,7 @@ class Agent:
         #     rl_transitions = self.rl_agent.buffer.__len__()
 
         # Gradient updates of RL actor and critic:
-        rl_train_scores = self.train_rl(self.gen_frames )
+        rl_train_scores = self.train_rl(self.gen_frames)
 
         # Validate RL actor separately:
         rl_reward, rl_std, rl_ep_len, rl_ep_std, rl_episode = self.validate_agent(self.rl_agent)
