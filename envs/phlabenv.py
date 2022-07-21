@@ -262,8 +262,6 @@ class CitationEnv(BaseEnv):
         return citation_input
 
     def reset (self, **kwargs) -> np.ndarray:
-        self.finish()
-        
         # Reset time
         self.t = 0.0
 

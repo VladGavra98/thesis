@@ -178,7 +178,7 @@ class Agent:
             for _ in tqdm(range(int(rl_transitions * self.args.frac_frames_train))):
                 self.rl_iteration+=1
 
-                batch = self.rl_agent.buffer.sample(self.args.batch_size)
+                batch = self.replay_buffer.sample(self.args.batch_size)
                 pgl, TD = self.rl_agent.update_parameters(batch, self.rl_iteration, self.champion_actor)
 
                 if pgl is not None: pgs_obj.append(-pgl)

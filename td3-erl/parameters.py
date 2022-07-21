@@ -88,7 +88,7 @@ class Parameters:
         self.use_champion_target = cla.champion_target
         
         # Genetic memory size
-        self.individual_bs = 100_000
+        self.individual_bs = 10_000
 
         if self.pop_size:
             # # increase buffer size for more experiences
